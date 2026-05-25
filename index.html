@@ -513,7 +513,7 @@ tr.tachado td:first-child { text-decoration: none; }
             <th class="col-purple">Fecha Efectiva</th><th class="col-purple" style="font-size:0.52rem">Origen</th>
             <th class="r">Meses Rezago</th><th class="r">Costo Unitario</th>
             <th class="r">Existencia</th><th class="r">Valor Inventario</th>
-            <th>Estado</th><th>Comentario</th>
+            <th>Estado</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
           </tr></thead>
           <tbody id="tbodyRez"></tbody>
           <tfoot id="tfootRez"></tfoot>
@@ -745,7 +745,7 @@ tr.tachado td:first-child { text-decoration: none; }
           <th style="color:var(--cyan)">Vendedor</th><th>Artículo</th>
           <th>Clasificación</th><th>Última Compra</th>
           <th class="r">Meses Rezago</th><th class="r">Existencia</th>
-          <th class="r">Valor Inv.</th><th>Comentario</th>
+          <th class="r">Valor Inv.</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
         </tr></thead>
         <tbody id="tbodyPoEntregar"></tbody>
         <tfoot id="tfootPoEntregar"></tfoot>
@@ -829,7 +829,7 @@ tr.tachado td:first-child { text-decoration: none; }
           <th style="color:var(--cyan)">Vendedor</th><th>Artículo</th>
           <th>Almacén</th><th>Clasificación</th><th>Última Compra</th>
           <th class="r">Meses Rezago</th><th class="r">Existencia</th>
-          <th class="r">Valor Inv.</th><th>Comentario</th>
+          <th class="r">Valor Inv.</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
         </tr></thead>
         <tbody id="tbodyInvFisico"></tbody>
         <tfoot id="tfootInvFisico"></tfoot>
@@ -840,7 +840,7 @@ tr.tachado td:first-child { text-decoration: none; }
   <!-- ══ TAB: POR COBRAR ═══════════════════════════════════════════════════ -->
   <div id="tab-porcobrar" class="tab-panel" style="display:none">
     <div class="hint-bar">
-      💳 Productos marcados desde Inventario Físico pendientes de cobro. Marca <strong style="color:var(--green)">✓ Cobrado</strong> para registrar el pago.
+      💳 Productos marcados en <strong>Rezagados</strong> pendientes de cobro. Marca <strong style="color:var(--green)">✓ Cobrado</strong> para registrar el pago — se moverá a la sección inferior agrupada por fecha. Usa <strong>↩ Regresar a Rezagados</strong> para deshacer el marcado.
     </div>
     <div class="toolbar">
       <span class="tlabel">Buscar:</span>
@@ -854,29 +854,22 @@ tr.tachado td:first-child { text-decoration: none; }
     <div class="table-wrap"><div class="tscroll" id="scrollPorCobrar">
       <table>
         <thead><tr>
-          <th style="width:36px">✓</th><th>#</th><th>Código</th>
+          <th>#</th><th>Código</th>
           <th style="color:var(--cyan)">Vendedor</th><th>Artículo</th>
           <th>Almacén</th><th>Clasificación</th><th>Fecha Registro</th>
           <th class="r">Meses Rezago</th><th class="r">Existencia</th>
-          <th class="r">Valor Inv.</th><th>Comentario</th>
+          <th class="r" style="color:var(--green)">Cobrado</th>
+          <th class="r" style="color:var(--amber)">Pendiente</th>
+          <th style="min-width:160px;color:var(--green)">Cobrar piezas</th>
+          <th>Comentario</th><th style="color:var(--blue2)">Responsable</th><th>↩</th>
         </tr></thead>
         <tbody id="tbodyPorCobrar"></tbody>
         <tfoot id="tfootPorCobrar"></tfoot>
       </table>
     </div></div>
     <div style="margin-top:28px;padding-top:20px;border-top:2px solid var(--border)">
-      <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.8rem;color:var(--green);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">✅ Cobrados</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>#</th><th>Código</th><th style="color:var(--cyan)">Vendedor</th>
-            <th>Artículo</th><th>Almacén</th><th>Clasificación</th>
-            <th>Fecha Cobro</th><th class="r">Existencia</th>
-            <th class="r">Valor Inv.</th><th>Comentario</th><th>↩</th>
-          </tr></thead>
-          <tbody id="tbodyCobrados"></tbody>
-        </table>
-      </div>
+      <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.8rem;color:var(--green);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">✅ Cobrados — agrupados por fecha</div>
+      <div id="cobradosPorFecha"></div>
     </div>
   </div>
 
@@ -1006,6 +999,7 @@ function getVendedor(row) {
 // ── PLATAFORMAS — constants and state defined early so loadPersisted() can use them ──
 const PLAT_KEY      = 'mc_inv_plataformas';
 const COMMENTS_KEY  = 'mc_inv_comments';
+const RESP_KEY      = 'mc_inv_resp';       // { idx_or_codigo: nombre }
 const DISCARDED_KEY = 'mc_inv_discarded';   // Set<codigo> of tachado products
 
 const PLATS = [
@@ -1014,7 +1008,8 @@ const PLATS = [
 
 let platData = {};
 let platDirty = false;
-let globalDirty = false;  // any unsaved change across all sections
+let globalDirty = false;
+let responsables = {};   // keyed by row._idx, same pattern as comments  // any unsaved change across all sections
 
 function markDirty() {
   globalDirty = true;
@@ -1043,10 +1038,16 @@ function saveAll() {
   try {
     // 1. Plataformas
     localStorage.setItem(PLAT_KEY, JSON.stringify(platData));
-    // 2. Comments (by código for stability across file reloads)
+    // 2. Comments and Responsables (by código)
     const byCode = {};
-    rawData.forEach(row => { const cod=String(row._raw[COL.codigo]||'').trim(); if(comments[row._idx]) byCode[cod]=comments[row._idx]; });
+    const byCodeResp = {};
+    rawData.forEach(row => {
+      const cod=String(row._raw[COL.codigo]||'').trim();
+      if(comments[row._idx]) byCode[cod]=comments[row._idx];
+      if(responsables[row._idx]) byCodeResp[cod]=responsables[row._idx];
+    });
     localStorage.setItem(COMMENTS_KEY, JSON.stringify(byCode));
+    localStorage.setItem(RESP_KEY, JSON.stringify(byCodeResp));
     // 3. Discarded (by código)
     const discardedCodes = [];
     rawData.forEach(row => { if(discarded.has(row._idx)) discardedCodes.push(String(row._raw[COL.codigo]||'').trim()); });
@@ -1066,6 +1067,8 @@ function loadPersisted() {
     if (p) platData = JSON.parse(p);
     const c = localStorage.getItem(COMMENTS_KEY);
     if (c) Object.assign(comments, JSON.parse(c));
+    const rr = localStorage.getItem(RESP_KEY);
+    if (rr) Object.assign(responsables, JSON.parse(rr));
     loadGUData();
     loadCobrarData();
     // discarded restored by código after rawData is populated — see restoreDiscardedByCode()
@@ -1103,7 +1106,7 @@ function processFile(file) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
       headers = json[0] ? json[0].map(h => String(h)) : [];
-      rawData = []; discarded = new Set(); comments = {}; selectedYear = null; selectedEmp = null; selectedAlm = null;
+      rawData = []; discarded = new Set(); comments = {}; responsables = {}; selectedYear = null; selectedEmp = null; selectedAlm = null;
       // Destroy existing virtual scrollers so they recreate with new data
       Object.keys(scrollers).forEach(k => { if(scrollers[k]) { scrollers[k].destroy(); delete scrollers[k]; } });
       for (let i = 1; i < json.length; i++) {
@@ -1219,6 +1222,21 @@ function makeCommentCell(idx) {
     const v = inp.value.trim();
     if (v) { comments[idx]=v; inp.classList.add('has-comment'); }
     else { delete comments[idx]; inp.classList.remove('has-comment'); }
+  });
+  inp.addEventListener('click', e => e.stopPropagation());
+  td.appendChild(inp); return td;
+}
+
+function makeResponsableCell(idx) {
+  const td = document.createElement('td'); td.className = 'comment-cell'; td.style.minWidth='130px';
+  const inp = document.createElement('input'); inp.type='text';
+  inp.className = 'comment-input' + (responsables[idx] ? ' has-comment' : '');
+  inp.style.color = responsables[idx] ? 'var(--blue2)' : '';
+  inp.value = responsables[idx]||''; inp.placeholder='👤 Responsable…';
+  inp.addEventListener('input', () => {
+    const v = inp.value.trim();
+    if (v) { responsables[idx]=v; inp.classList.add('has-comment'); inp.style.color='var(--blue2)'; markDirty(); }
+    else { delete responsables[idx]; inp.classList.remove('has-comment'); inp.style.color=''; markDirty(); }
   });
   inp.addEventListener('click', e => e.stopPropagation());
   td.appendChild(inp); return td;
@@ -1393,7 +1411,31 @@ function renderRezagados() {
 
     const tdCk=document.createElement('td');
     const ck=document.createElement('input'); ck.type='checkbox'; ck.className='row-check'; ck.checked=isDesc;
-    ck.addEventListener('change',()=>{ pushUndo('rezagados',{discarded:new Set(discarded)}); if(ck.checked) discarded.add(row._idx); else discarded.delete(row._idx); markDirty(); updateStats(); renderRezagados(); });
+    ck.addEventListener('change',()=>{
+      pushUndo('rezagados',{discarded:new Set(discarded), cobrarData:JSON.parse(JSON.stringify(cobrarData)), guData:JSON.parse(JSON.stringify(guData))});
+      const cod = String(row._raw[COL.codigo]||'').trim();
+      if(ck.checked){
+        discarded.add(row._idx);
+        // → Por Cobrar
+        const ce = getCobrarEntry(cod);
+        ce.porcobrar = true;
+        ce.fechaRegistro = new Date().toLocaleDateString('es-MX');
+        saveCobrarData();
+        // → GU Por Entregar (guData stays as-is; it appears via discarded)
+      } else {
+        discarded.delete(row._idx);
+        // Undo porcobrar if not yet cobrado
+        const ce = getCobrarEntry(cod);
+        if (!ce.cobrado) { ce.porcobrar=false; ce.fechaRegistro=''; saveCobrarData(); }
+        // Undo GU if not yet entregado
+        const ge = getGUEntry(cod);
+        if (!ge.entregado) { ge.entregado=false; ge.fechaEntrega=''; saveGUData(); }
+      }
+      markDirty(); updateStats(); updateGUBadges(); updateInvFisicoBadge();
+      renderRezagados();
+      if(activeTab==='porcobrar') renderPorCobrar();
+      if(activeTab==='poentregar') renderPoEntregar();
+    });
     tdCk.appendChild(ck); tr.appendChild(tdCk);
     const tdN=document.createElement('td'); tdN.textContent=i+1; tdN.style.color='var(--text3)'; tr.appendChild(tdN);
 
@@ -1412,6 +1454,7 @@ function renderRezagados() {
     const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(valor); tr.appendChild(tdV);
     const tdE=document.createElement('td'); tdE.innerHTML=isDesc?`<span class="chip chip-desc">✗ Desc.</span>`:`<span class="chip chip-red">⚠ Pend.</span>`; tr.appendChild(tdE);
     tr.appendChild(makeCommentCell(row._idx));
+    tr.appendChild(makeResponsableCell(row._idx));
     return tr;
   };
   if (scrollers.rez) scrollers.rez.setRows(f);
@@ -1419,8 +1462,8 @@ function renderRezagados() {
 
   if (estado!=='descontados') {
     const tr=document.createElement('tr');
-    ['','','','','TOTALES PEND.','','','','','',fmtNum(tEx),fmtMoney(tVal),'',''].forEach((v,i) => {
-      const td=document.createElement('td'); td.textContent=v; if([10,11].includes(i)) td.style.textAlign='right'; tr.appendChild(td);
+    ['','','','','TOTALES PEND.','','','','','','',fmtNum(tEx),fmtMoney(tVal),'','',''].forEach((v,i) => {
+      const td=document.createElement('td'); td.textContent=v; if([11,12].includes(i)) td.style.textAlign='right'; tr.appendChild(td);
     });
     tfoot.appendChild(tr);
   }
@@ -2225,6 +2268,15 @@ function restoreCommentsByCode() {
       const cod = String(row._raw[COL.codigo]||'').trim();
       if (byCode[cod]) comments[row._idx] = byCode[cod];
     });
+    // Also restore responsables
+    const savedR = localStorage.getItem(RESP_KEY);
+    if (savedR) {
+      const byCodeR = JSON.parse(savedR);
+      rawData.forEach(row => {
+        const cod = String(row._raw[COL.codigo]||'').trim();
+        if (byCodeR[cod]) responsables[row._idx] = byCodeR[cod];
+      });
+    }
   } catch(e) {}
 }
 
@@ -2427,9 +2479,27 @@ function saveCobrarData() {
   try { localStorage.setItem(COBRAR_KEY, JSON.stringify(cobrarData)); } catch(e){}
   markDirty();
 }
+// cobrarData: { [codigo]: { porcobrar, fechaRegistro, cobros:[{piezas,fecha}] } }
+// cobrado = true when sum(cobros.piezas) >= existencia
 function getCobrarEntry(codigo) {
-  if (!cobrarData[codigo]) cobrarData[codigo]={ porcobrar:false, fechaRegistro:'', cobrado:false, fechaCobro:'' };
-  return cobrarData[codigo];
+  if (!cobrarData[codigo]) cobrarData[codigo]={ porcobrar:false, fechaRegistro:'', cobros:[] };
+  const e = cobrarData[codigo];
+  // Migrate old format (single cobrado/fechaCobro) to new cobros array
+  if (e.cobrado !== undefined && e.fechaCobro !== undefined && !e.cobros) {
+    e.cobros = e.cobrado ? [{ piezas: null, fecha: e.fechaCobro }] : [];
+    delete e.cobrado; delete e.fechaCobro;
+  }
+  if (!e.cobros) e.cobros = [];
+  return e;
+}
+// Helper: total piezas cobradas for a codigo
+function piezasCobradas(codigo) {
+  const e = getCobrarEntry(codigo);
+  return e.cobros.reduce((s,c)=>s+(c.piezas||0),0);
+}
+// Helper: is fully cobrado (all piezas cobradas)
+function isCobradoTotal(codigo, exist) {
+  return piezasCobradas(codigo) >= exist && exist > 0;
 }
 
 function loadGUData() {
@@ -2769,24 +2839,26 @@ function renderPorCobrar() {
   if(activeTab!=='porcobrar'){tabDirty.porcobrar=true;return;}
   const search=document.getElementById('searchPorCobrar').value.toLowerCase();
 
-  // Pending: porcobrar=true, cobrado=false — find corresponding rawData rows
   const pendRows=rawData.filter(r=>{
     const cod=String(r._raw[COL.codigo]||'').trim(); const ce=getCobrarEntry(cod);
-    return ce.porcobrar && !ce.cobrado;
+    if(!ce.porcobrar) return false;
+    const exist=parseNum(r._raw[COL.existencia]);
+    return piezasCobradas(cod) < exist; // still has pending piezas
   }).filter(r=>!search||(String(r._raw[COL.codigo]||'').toLowerCase().includes(search)||String(r._raw[COL.articulo]||'').toLowerCase().includes(search)));
   pendRows.sort((a,b)=>(calcMeses(b)||0)-(calcMeses(a)||0));
 
   const cobradoRows=rawData.filter(r=>{
     const cod=String(r._raw[COL.codigo]||'').trim(); const ce=getCobrarEntry(cod);
-    return ce.porcobrar && ce.cobrado;
+    return ce.porcobrar && (ce.cobros||[]).some(c=>(c.piezas||0)>0);
   }).filter(r=>!search||(String(r._raw[COL.codigo]||'').toLowerCase().includes(search)||String(r._raw[COL.articulo]||'').toLowerCase().includes(search)));
 
   const tbody=document.getElementById('tbodyPorCobrar');
   const tfoot=document.getElementById('tfootPorCobrar');
   tfoot.innerHTML='';
 
+  // ── PENDIENTES ──
   if(!pendRows.length){
-    tbody.innerHTML=`<tr><td colspan="12"><div class="empty"><div class="empty-icon">💳</div>No hay productos pendientes de cobro</div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="13"><div class="empty"><div class="empty-icon">💳</div>No hay productos pendientes de cobro</div></td></tr>`;
     if(scrollers.porcobrar){scrollers.porcobrar.destroy();delete scrollers.porcobrar;}
   } else {
     const tEx=pendRows.reduce((s,r)=>s+parseNum(r._raw[COL.existencia]),0);
@@ -2794,14 +2866,12 @@ function renderPorCobrar() {
 
     const buildCobrarRow=(row,i)=>{
       const cod=String(row._raw[COL.codigo]||'').trim(); const ce=getCobrarEntry(cod); const meses=calcMeses(row);
+      const exist=parseNum(row._raw[COL.existencia]);
+      const cobradas=piezasCobradas(cod);
+      const pendiente=Math.max(0, exist - cobradas);
       const tr=document.createElement('tr');
-      const tdCk=document.createElement('td');
-      const ck=document.createElement('input'); ck.type='checkbox'; ck.className='row-check'; ck.style.accentColor='var(--green)';
-      ck.title='Marcar como cobrado';
-      ck.addEventListener('change',()=>{
-        if(ck.checked){pushUndo('porcobrar',{cobrarData:JSON.parse(JSON.stringify(cobrarData))}); ce.cobrado=true;ce.fechaCobro=new Date().toLocaleDateString('es-MX');saveCobrarData();renderPorCobrar();updateInvFisicoBadge();}
-      });
-      tdCk.appendChild(ck); tr.appendChild(tdCk);
+      if (cobradas > 0) tr.style.background='rgba(27,196,125,0.04)';
+
       const tdN=document.createElement('td'); tdN.textContent=i+1; tdN.style.color='var(--text3)'; tr.appendChild(tdN);
       const tdC=document.createElement('td'); tdC.textContent=cod; tdC.style.fontWeight='600'; tr.appendChild(tdC);
       tr.appendChild(makeVendCell(row));
@@ -2813,49 +2883,180 @@ function renderPorCobrar() {
       if(meses!==null){const p=Math.min((meses/24)*100,100); tdM.innerHTML=`<span class="meses-tag over">${meses}m</span><span class="prog"><span class="prog-fill" style="width:${p}%;background:var(--red)"></span></span>`;}
       else tdM.innerHTML='<span style="color:var(--text3)">—</span>';
       tr.appendChild(tdM);
-      const tdEx=document.createElement('td'); tdEx.className='r'; tdEx.textContent=fmtNum(parseNum(row._raw[COL.existencia])); tr.appendChild(tdEx);
-      const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(parseNum(row._raw[COL.valorInv])); tr.appendChild(tdV);
+      // Existencia
+      const tdEx=document.createElement('td'); tdEx.className='r'; tdEx.textContent=fmtNum(exist); tr.appendChild(tdEx);
+      // Cobrado
+      const tdCob=document.createElement('td'); tdCob.className='r';
+      tdCob.style.color=cobradas>0?'var(--green)':'var(--text3)';
+      tdCob.textContent=cobradas>0?fmtNum(cobradas):'—'; tr.appendChild(tdCob);
+      // Pendiente
+      const tdPend=document.createElement('td'); tdPend.className='r';
+      tdPend.style.color=pendiente>0?'var(--amber)':'var(--green)';
+      tdPend.style.fontWeight='600';
+      tdPend.textContent=pendiente>0?fmtNum(pendiente):'✓ Todo cobrado'; tr.appendChild(tdPend);
+
+      // ── Cobrar piezas input + button ──
+      const tdInp=document.createElement('td'); tdInp.style.cssText='white-space:nowrap;';
+      const inp=document.createElement('input');
+      inp.type='number'; inp.min='1'; inp.step='1'; inp.value=pendiente>0?pendiente:0;
+      inp.style.cssText=`width:64px;background:var(--surface2);border:1px solid var(--border2);color:var(--green);
+        font-family:'Inter',sans-serif;font-size:0.76rem;font-weight:600;padding:4px 6px;
+        border-radius:4px 0 0 4px;text-align:center;outline:none;`;
+      inp.addEventListener('focus',()=>inp.style.borderColor='var(--green)');
+      inp.addEventListener('blur',()=>inp.style.borderColor='var(--border2)');
+      inp.addEventListener('input',()=>{
+        const v=parseInt(inp.value)||0;
+        if(v>pendiente){inp.value=pendiente;inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='var(--green)',800);}
+        if(v<0) inp.value=0;
+      });
+      const btnCob=document.createElement('button');
+      btnCob.className='btn btn-primary'; btnCob.style.cssText='border-radius:0 4px 4px 0;padding:4px 10px;font-size:0.72rem;';
+      btnCob.textContent='✓ Cobrar';
+      btnCob.addEventListener('click',()=>{
+        const piezas=parseInt(inp.value)||0;
+        if(piezas<=0){inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='var(--green)',800);return;}
+        if(piezas>pendiente){inp.value=pendiente;return;}
+        pushUndo('porcobrar',{cobrarData:JSON.parse(JSON.stringify(cobrarData))});
+        ce.cobros.push({ piezas, fecha:new Date().toLocaleDateString('es-MX') });
+        saveCobrarData(); markDirty(); renderPorCobrar(); updateInvFisicoBadge();
+      });
+      tdInp.appendChild(inp); tdInp.appendChild(btnCob); tr.appendChild(tdInp);
+
       tr.appendChild(makeCommentCell(row._idx));
+      tr.appendChild(makeResponsableCell(row._idx));
+
+      // ↩ Regresar a Rezagados
+      const tdR=document.createElement('td');
+      const btnR=document.createElement('button'); btnR.className='btn btn-danger'; btnR.style.cssText='font-size:0.62rem;padding:4px 8px;white-space:nowrap';
+      btnR.textContent='↩ Rezagados';
+      btnR.title='Quitar de Por Cobrar y de GU Por Entregar, regresar a Rezagados';
+      btnR.addEventListener('click',()=>{
+        pushUndo('porcobrar',{cobrarData:JSON.parse(JSON.stringify(cobrarData)), discarded:new Set(discarded), guData:JSON.parse(JSON.stringify(guData))});
+        ce.porcobrar=false; ce.fechaRegistro=''; ce.cobros=[]; saveCobrarData();
+        const ge=getGUEntry(cod); if(!ge.entregado){ge.entregado=false; ge.fechaEntrega=''; saveGUData();}
+        discarded.delete(row._idx);
+        markDirty(); updateStats(); updateGUBadges(); updateInvFisicoBadge();
+        renderPorCobrar();
+        if(activeTab==='rezagados') renderRezagados();
+        if(activeTab==='poentregar') renderPoEntregar();
+      });
+      tdR.appendChild(btnR); tr.appendChild(tdR);
       return tr;
     };
     if(scrollers.porcobrar) scrollers.porcobrar.setRows(pendRows);
-    else scrollers.porcobrar=createVirtualScroller(document.getElementById('scrollPorCobrar'),tbody,pendRows,buildCobrarRow,12);
-    tfoot.innerHTML=`<tr><td colspan="9" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td></tr>`;
+    else scrollers.porcobrar=createVirtualScroller(document.getElementById('scrollPorCobrar'),tbody,pendRows,buildCobrarRow,15);
+    tfoot.innerHTML=`<tr>
+      <td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td>
+      <td class="r">${fmtNum(pendRows.reduce((s,r)=>s+parseNum(r._raw[COL.existencia]),0))}</td>
+      <td class="r" style="color:var(--green)">${fmtNum(pendRows.reduce((s,r)=>s+piezasCobradas(String(r._raw[COL.codigo]||'').trim()),0))}</td>
+      <td class="r" style="color:var(--amber)">${fmtNum(pendRows.reduce((s,r)=>{const ex=parseNum(r._raw[COL.existencia]);return s+Math.max(0,ex-piezasCobradas(String(r._raw[COL.codigo]||'').trim()));},0))}</td>
+      <td></td><td></td><td></td>
+    </tr>`;
   }
 
-  // Cobrados section
-  const tbodyC=document.getElementById('tbodyCobrados'); tbodyC.innerHTML='';
-  if(!cobradoRows.length){
-    tbodyC.innerHTML=`<tr><td colspan="11"><div class="empty" style="padding:20px"><div class="empty-icon">✅</div>Aún no hay cobros registrados</div></td></tr>`;
+  // ── COBRADOS agrupados por fecha ──
+  const container=document.getElementById('cobradosPorFecha'); container.innerHTML='';
+
+  // Gather all individual cobro events from ALL porcobrar rows (not just filtered)
+  const allCobros=[];
+  rawData.forEach(row=>{
+    const cod=String(row._raw[COL.codigo]||'').trim(); const ce=getCobrarEntry(cod);
+    if(!ce.porcobrar) return;
+    (ce.cobros||[]).forEach((c,idx)=>{ if((c.piezas||0)>0) allCobros.push({row,cod,ce,piezas:c.piezas,fecha:c.fecha||'Sin fecha',cobroIdx:idx}); });
+  });
+  // Filter by search if active
+  const filteredCobros = !search ? allCobros : allCobros.filter(c=>
+    c.cod.toLowerCase().includes(search) || String(c.row._raw[COL.articulo]||'').toLowerCase().includes(search)
+  );
+
+  if(!filteredCobros.length){
+    container.innerHTML=`<div class="empty" style="padding:20px"><div class="empty-icon">✅</div>Aún no hay cobros registrados</div>`;
     return;
   }
-  cobradoRows.forEach((row,i)=>{
-    const cod=String(row._raw[COL.codigo]||'').trim(); const ce=getCobrarEntry(cod);
-    const tr=document.createElement('tr'); tr.style.opacity='0.75';
-    const tdN=document.createElement('td'); tdN.textContent=i+1; tdN.style.color='var(--text3)'; tr.appendChild(tdN);
-    const tdC=document.createElement('td'); tdC.textContent=cod; tdC.style.fontWeight='600'; tr.appendChild(tdC);
-    tr.appendChild(makeVendCell(row));
-    const tdA=document.createElement('td'); tdA.textContent=row._raw[COL.articulo]||'—'; tr.appendChild(tdA);
-    const tdAlm=document.createElement('td'); tdAlm.textContent=row._raw[COL.almacen]||'—'; tr.appendChild(tdAlm);
-    const tdCl=document.createElement('td'); tdCl.textContent=getClasif(row); tr.appendChild(tdCl);
-    const tdFc=document.createElement('td'); tdFc.textContent=ce.fechaCobro||'—'; tdFc.style.color='var(--green)'; tr.appendChild(tdFc);
-    const tdEx=document.createElement('td'); tdEx.className='r'; tdEx.textContent=fmtNum(parseNum(row._raw[COL.existencia])); tr.appendChild(tdEx);
-    const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(parseNum(row._raw[COL.valorInv])); tr.appendChild(tdV);
-    tr.appendChild(makeCommentCell(row._idx));
-    const tdU=document.createElement('td');
-    const btn=document.createElement('button'); btn.className='btn btn-ghost'; btn.style.fontSize='0.65rem'; btn.textContent='↩';
-    btn.addEventListener('click',()=>{ce.cobrado=false;ce.fechaCobro='';saveCobrarData();renderPorCobrar();updateInvFisicoBadge();});
-    tdU.appendChild(btn); tr.appendChild(tdU);
-    tbodyC.appendChild(tr);
+
+  // Group by fecha
+  const byDate2={};
+  filteredCobros.forEach(c=>{ if(!byDate2[c.fecha]) byDate2[c.fecha]=[]; byDate2[c.fecha].push(c); });
+  const parse2=s=>{ const p=s.split('/'); return p.length===3?new Date(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`):new Date(s); };
+  const fechas2=Object.keys(byDate2).sort((a,b)=>parse2(b)-parse2(a));
+
+  fechas2.forEach(fecha=>{
+    const cobros=byDate2[fecha];
+    const totPiezas=cobros.reduce((s,c)=>s+c.piezas,0);
+    const totValor=cobros.reduce((s,c)=>{
+      const exist=parseNum(c.row._raw[COL.existencia]); const val=parseNum(c.row._raw[COL.valorInv]);
+      return s + (exist>0 ? Math.round(val/exist*c.piezas) : 0);
+    },0);
+
+    const header=document.createElement('div');
+    header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px 6px 0 0;margin-top:14px;';
+    header.innerHTML=`<span style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.82rem;color:var(--green)">✅ ${fecha}</span>
+      <span style="font-size:0.72rem;color:var(--text2)">${cobros.length} movimiento${cobros.length!==1?'s':''} · <strong style="color:var(--green)">${totPiezas.toLocaleString('es-MX')} piezas</strong> · ${fmtMoney(totValor)}</span>`;
+    container.appendChild(header);
+
+    const tbl=document.createElement('table');
+    tbl.style.cssText='width:100%;border-collapse:collapse;font-size:0.73rem;border:1px solid var(--border);border-top:none;';
+    tbl.innerHTML=`<thead><tr style="background:var(--surface2)">
+      <th style="padding:7px 11px;text-align:left;font-size:0.6rem;color:var(--text3);text-transform:uppercase">#</th>
+      <th style="padding:7px 11px;text-align:left">Código</th>
+      <th style="padding:7px 11px;text-align:left;color:var(--cyan)">Vendedor</th>
+      <th style="padding:7px 11px;text-align:left">Artículo</th>
+      <th style="padding:7px 11px;text-align:left">Almacén</th>
+      <th style="padding:7px 11px;text-align:right;color:var(--green)">Piezas cobradas</th>
+      <th style="padding:7px 11px;text-align:right">Existencia total</th>
+      <th style="padding:7px 11px;text-align:right">Valor aprox.</th>
+      <th style="padding:7px 11px">↩</th>
+    </tr></thead>`;
+    const tbodyD=document.createElement('tbody');
+    cobros.forEach((c,i)=>{
+      const exist=parseNum(c.row._raw[COL.existencia]); const val=parseNum(c.row._raw[COL.valorInv]);
+      const valorPieza=exist>0?val/exist:0;
+      const tr=document.createElement('tr'); tr.style.cssText='border-top:1px solid rgba(42,44,63,0.5);opacity:0.88;';
+      [
+        {v:i+1,s:'color:var(--text3);padding:7px 11px'},
+        {v:c.cod,s:'font-weight:600;padding:7px 11px'},
+        {v:getVendedor(c.row),s:'color:var(--cyan);font-size:0.68rem;padding:7px 11px'},
+        {v:c.row._raw[COL.articulo]||'—',s:'padding:7px 11px'},
+        {v:c.row._raw[COL.almacen]||'—',s:'padding:7px 11px'},
+        {v:fmtNum(c.piezas),s:'text-align:right;color:var(--green);font-weight:700;padding:7px 11px'},
+        {v:fmtNum(exist),s:'text-align:right;padding:7px 11px'},
+        {v:fmtMoney(Math.round(valorPieza*c.piezas)),s:'text-align:right;padding:7px 11px'},
+      ].forEach(({v,s})=>{ const td=document.createElement('td'); td.textContent=v; td.style.cssText=s; tr.appendChild(td); });
+      const tdU=document.createElement('td'); tdU.style.padding='4px 8px';
+      const btn=document.createElement('button'); btn.className='btn btn-ghost'; btn.style.fontSize='0.62rem'; btn.textContent='↩';
+      btn.title=`Deshacer este cobro de ${c.piezas} pieza${c.piezas!==1?'s':''}`;
+      btn.addEventListener('click',()=>{
+        pushUndo('porcobrar',{cobrarData:JSON.parse(JSON.stringify(cobrarData))});
+        // Remove this specific cobro by index
+        const currentIdx = c.ce.cobros.indexOf(c.ce.cobros[c.cobroIdx]);
+        c.ce.cobros.splice(c.cobroIdx,1);
+        saveCobrarData(); markDirty(); renderPorCobrar(); updateInvFisicoBadge();
+      });
+      tdU.appendChild(btn); tr.appendChild(tdU);
+      tbodyD.appendChild(tr);
+    });
+    tbl.appendChild(tbodyD); container.appendChild(tbl);
   });
 }
 
 function exportPorCobrar() {
   const wb=XLSX.utils.book_new();
-  const all=rawData.filter(r=>getCobrarEntry(String(r._raw[COL.codigo]||'').trim()).porcobrar);
-  const sheet=[['Código','Vendedor','Artículo','Almacén','Clasificación','Fecha Registro','Meses Rezago','Existencia','Valor Inventario','Estado Cobro','Fecha Cobro','Comentario']];
-  all.forEach(r=>{const cod=String(r._raw[COL.codigo]||'').trim();const ce=getCobrarEntry(cod); sheet.push([cod,getVendedor(r),r._raw[COL.articulo],r._raw[COL.almacen],getClasif(r),ce.fechaRegistro||'',calcMeses(r),parseNum(r._raw[COL.existencia]),parseNum(r._raw[COL.valorInv]),ce.cobrado?'COBRADO':'PENDIENTE',ce.fechaCobro||'',comments[r._idx]||'']);});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sheet),'Por Cobrar');
+  // Sheet 1: Pending
+  const pend=[['Código','Vendedor','Artículo','Almacén','Clasificación','Fecha Registro','Meses Rezago','Existencia','Piezas Cobradas','Piezas Pendientes','Comentario']];
+  rawData.filter(r=>getCobrarEntry(String(r._raw[COL.codigo]||'').trim()).porcobrar).forEach(r=>{
+    const cod=String(r._raw[COL.codigo]||'').trim(); const exist=parseNum(r._raw[COL.existencia]);
+    const cobradas=piezasCobradas(cod);
+    pend.push([cod,getVendedor(r),r._raw[COL.articulo],r._raw[COL.almacen],getClasif(r),getCobrarEntry(cod).fechaRegistro||'',calcMeses(r),exist,cobradas,Math.max(0,exist-cobradas),comments[r._idx]||'']);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pend),'Por Cobrar');
+  // Sheet 2: Cobros detalle
+  const det=[['Código','Vendedor','Artículo','Almacén','Fecha Cobro','Piezas','Valor Aprox.']];
+  rawData.forEach(r=>{
+    const cod=String(r._raw[COL.codigo]||'').trim(); const ce=getCobrarEntry(cod); if(!ce.porcobrar)return;
+    const exist=parseNum(r._raw[COL.existencia]); const val=parseNum(r._raw[COL.valorInv]);
+    (ce.cobros||[]).forEach(c=>{ if((c.piezas||0)>0) det.push([cod,getVendedor(r),r._raw[COL.articulo],r._raw[COL.almacen],c.fecha||'',c.piezas,exist>0?Math.round(val/exist*c.piezas):0]); });
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(det),'Cobros Detalle');
   XLSX.writeFile(wb,`por_cobrar_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
