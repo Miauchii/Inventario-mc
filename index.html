@@ -728,7 +728,7 @@ tr.tachado td:first-child { text-decoration: none; }
   <!-- ══ TAB: POR ENTREGAR A GU ═══════════════════════════════════════════ -->
   <div id="tab-poentregar" class="tab-panel" style="display:none">
     <div class="hint-bar">
-      📦 Productos tachados en Rezagados que serán entregados a GU. Marca <strong>✓ Entregado</strong> cuando el producto haya sido físicamente entregado — pasará a la pestaña <strong>Entregado a GU</strong>.
+      📦 Productos listos para entregar a GU. <strong>Desde Rezagados:</strong> aparece aquí después del primer cobro registrado en Por Cobrar. <strong>Desde Inventario Físico:</strong> aparece aquí inmediatamente al ser marcado. Marca <strong>✓ Entregado</strong> cuando el producto haya sido físicamente entregado.
     </div>
     <div class="toolbar">
       <span class="tlabel">Buscar:</span>
@@ -840,7 +840,7 @@ tr.tachado td:first-child { text-decoration: none; }
   <!-- ══ TAB: POR COBRAR ═══════════════════════════════════════════════════ -->
   <div id="tab-porcobrar" class="tab-panel" style="display:none">
     <div class="hint-bar">
-      💳 Productos marcados en <strong>Rezagados</strong> pendientes de cobro. Marca <strong style="color:var(--green)">✓ Cobrado</strong> para registrar el pago — se moverá a la sección inferior agrupada por fecha. Usa <strong>↩ Regresar a Rezagados</strong> para deshacer el marcado.
+      💳 Productos pendientes de cobro. <strong>Desde Rezagados:</strong> aparece aquí primero — al registrar el primer cobro pasa a <strong>GU Por Entregar</strong>. <strong>Desde Inventario Físico:</strong> ya está en GU Por Entregar — aquí solo se registra el cobro. Usa <strong>↩ Regresar a Rezagados</strong> para deshacer el flujo completo.
     </div>
     <div class="toolbar">
       <span class="tlabel">Buscar:</span>
@@ -1416,12 +1416,13 @@ function renderRezagados() {
       const cod = String(row._raw[COL.codigo]||'').trim();
       if(ck.checked){
         discarded.add(row._idx);
-        // → Por Cobrar
+        // → Por Cobrar (from Rezagados — goes to GU only after cobrado)
         const ce = getCobrarEntry(cod);
         ce.porcobrar = true;
+        ce.desdeInvFisico = false;
         ce.fechaRegistro = new Date().toLocaleDateString('es-MX');
         saveCobrarData();
-        // → GU Por Entregar (guData stays as-is; it appears via discarded)
+        // NOT added to GU Por Entregar yet — happens after first cobro
       } else {
         discarded.delete(row._idx);
         // Undo porcobrar if not yet cobrado
@@ -2516,20 +2517,30 @@ function getGUEntry(codigo) {
 
 // Returns rows that are: discarded (tachados) in rezagados
 function getPoEntregarRows() {
-  return rawData.filter(r => discarded.has(r._idx) && isRezagado(r) && !getGUEntry(String(r._raw[COL.codigo]||'').trim()).entregado);
+  return rawData.filter(r => {
+    if (!isRezagado(r)) return false;
+    if (getGUEntry(String(r._raw[COL.codigo]||'').trim()).entregado) return false;
+    const cod = String(r._raw[COL.codigo]||'').trim();
+    const ce = getCobrarEntry(cod);
+    if (!ce.porcobrar) return false;
+    // From Inventario Físico → show immediately (desdeInvFisico flag)
+    if (ce.desdeInvFisico) return discarded.has(r._idx);
+    // From Rezagados → only show after at least 1 pieza cobrada
+    return piezasCobradas(cod) > 0;
+  });
 }
 function getEntregadoRows() {
   return rawData.filter(r => {
     const cod = String(r._raw[COL.codigo]||'').trim();
     const e = getGUEntry(cod);
-    return discarded.has(r._idx) && isRezagado(r) && e.entregado && !e.vendido;
+    return isRezagado(r) && e.entregado && !e.vendido;
   });
 }
 function getVendidoRows() {
   return rawData.filter(r => {
     const cod = String(r._raw[COL.codigo]||'').trim();
     const e = getGUEntry(cod);
-    return discarded.has(r._idx) && isRezagado(r) && e.entregado && e.vendido;
+    return isRezagado(r) && e.entregado && e.vendido;
   });
 }
 
@@ -2774,7 +2785,7 @@ function renderInvFisico() {
       pushUndo('invfisico', { discarded: new Set(discarded), cobrarData: JSON.parse(JSON.stringify(cobrarData)) });
       if(ck.checked){
         const ce=getCobrarEntry(cod);
-        ce.porcobrar=true; ce.fechaRegistro=new Date().toLocaleDateString('es-MX');
+        ce.porcobrar=true; ce.desdeInvFisico=true; ce.fechaRegistro=new Date().toLocaleDateString('es-MX');
         saveCobrarData();
         discarded.add(row._idx);
         markDirty(); updateStats(); updateGUBadges(); updateInvFisicoBadge();
@@ -2919,6 +2930,9 @@ function renderPorCobrar() {
         pushUndo('porcobrar',{cobrarData:JSON.parse(JSON.stringify(cobrarData))});
         ce.cobros.push({ piezas, fecha:new Date().toLocaleDateString('es-MX') });
         saveCobrarData(); markDirty(); renderPorCobrar(); updateInvFisicoBadge();
+        // If from Rezagados, now appears in GU Por Entregar for first time
+        updateGUBadges();
+        if(activeTab==='poentregar') renderPoEntregar();
       });
       tdInp.appendChild(inp); tdInp.appendChild(btnCob); tr.appendChild(tdInp);
 
