@@ -381,6 +381,8 @@ tr.tachado td:first-child { text-decoration: none; }
     <span class="nav-title">Gestor de Inventario Rezagado</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
+    <span id="navFileName" style="display:none;font-size:0.68rem;color:var(--text3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <button id="navChangeFile" onclick="document.getElementById('fileInput').click()" style="display:none;background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">📂 Cambiar archivo</button>
     <button id="navSaveBtn" onclick="saveAll()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">💾 Guardar</button>
     <span class="nav-badge">Interno</span>
   </div>
@@ -393,7 +395,7 @@ tr.tachado td:first-child { text-decoration: none; }
   <div id="uploadZone" onclick="document.getElementById('fileInput').click()">
     <span class="upload-icon">📊</span>
     <div class="upload-title">Arrastra tu Excel aquí o haz clic para seleccionar</div>
-    <div class="upload-sub" style="margin-top:6px">Formato .xlsx · Columnas: Código (C), Artículo (D), Clasificación (G), Última Compra (I), Costo (J), Existencia (K), Valor (L)</div>
+    <div class="upload-sub" style="margin-top:6px">Formato .xlsx · El archivo se guarda automáticamente para la próxima visita</div>
     <input type="file" id="fileInput" accept=".xlsx,.xls">
   </div>
   <div id="statusBar"><div class="status-dot"></div><span id="statusText">Cargando…</span></div>
@@ -1001,7 +1003,9 @@ const PLAT_KEY      = 'mc_inv_plataformas';
 const COMMENTS_KEY  = 'mc_inv_comments';
 const RESP_KEY      = 'mc_inv_resp';
 const DISCARDED_KEY = 'mc_inv_discarded';
-const SNAPSHOT_KEY  = 'mc_inv_snapshot';  // { [codigo]: {articulo,almacen,clasif,vendedor,existencia,valorInv,ultCompra} }   // Set<codigo> of tachado products
+const SNAPSHOT_KEY  = 'mc_inv_snapshot';
+const EXCEL_KEY     = 'mc_inv_excel';      // base64 of last loaded .xlsx file
+const EXCEL_NAME_KEY= 'mc_inv_excel_name'; // filename of last loaded file
 
 const PLATS = [
   { key:'ml', label:'Mercado Libre', color:'#ffce44' },
@@ -1109,6 +1113,11 @@ let rawData = [], headers = [], discarded = new Set(), comments = {}, selectedYe
 // Load any previously saved plataforma data on startup
 loadPersisted();
 
+// Auto-load saved Excel if available
+document.addEventListener('DOMContentLoaded', () => {
+  if (localStorage.getItem(EXCEL_KEY)) loadSavedExcel();
+});
+
 // ── FILE ──────────────────────────────────────────────────────────────────
 const fileInput = document.getElementById('fileInput');
 const uploadZone = document.getElementById('uploadZone');
@@ -1122,12 +1131,12 @@ function processFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const arrayBuf = e.target.result;
+      const wb = XLSX.read(arrayBuf, { type: 'array', cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
       headers = json[0] ? json[0].map(h => String(h)) : [];
       rawData = []; discarded = new Set(); comments = {}; responsables = {}; selectedYear = null; selectedEmp = null; selectedAlm = null;
-      // Destroy existing virtual scrollers so they recreate with new data
       Object.keys(scrollers).forEach(k => { if(scrollers[k]) { scrollers[k].destroy(); delete scrollers[k]; } });
       for (let i = 1; i < json.length; i++) {
         const row = json[i];
@@ -1138,14 +1147,16 @@ function processFile(file) {
       loadPersisted();
       restoreCommentsByCode();
       restoreDiscardedByCode();
+
+      // Save Excel to localStorage for auto-reload next visit
+      saveExcelToStorage(arrayBuf, file.name);
+
       showLoading(false);
       setStatus(`✓ ${file.name} — ${rawData.length} productos cargados`);
-      document.getElementById('appSection').style.display = 'block';
+      showApp(file.name);
       populateFilters(); updateStats();
-      // Mark all tabs dirty — each will render when first opened
       Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
       tabDirty[activeTab] = false;
-      // Defer render until browser has painted the visible tab panel
       requestAnimationFrame(() => {
         if (activeTab==='bdd')            renderBDD();
         else if (activeTab==='rezagados') renderRezagados();
@@ -1158,6 +1169,91 @@ function processFile(file) {
     } catch(err) { showLoading(false); setStatus('Error: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
+}
+
+function showApp(fileName) {
+  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('appSection').style.display = 'block';
+  document.getElementById('navChangeFile').style.display = 'inline-block';
+  const nameEl = document.getElementById('navFileName');
+  nameEl.textContent = '📄 ' + fileName;
+  nameEl.style.display = 'inline';
+}
+
+function saveExcelToStorage(arrayBuf, fileName) {
+  try {
+    // Convert ArrayBuffer to base64
+    const bytes = new Uint8Array(arrayBuf);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    const b64 = btoa(binary);
+    const sizeMB = (b64.length / 1024 / 1024).toFixed(1);
+    if (b64.length > 4.5 * 1024 * 1024) {
+      console.warn(`Excel (${sizeMB}MB) demasiado grande para guardar automáticamente`);
+      setStatus(`✓ ${fileName} — ${rawData.length} productos · ⚠ Archivo muy grande para auto-guardar (${sizeMB}MB)`);
+      return;
+    }
+    localStorage.setItem(EXCEL_KEY, b64);
+    localStorage.setItem(EXCEL_NAME_KEY, fileName);
+  } catch(e) {
+    console.warn('No se pudo guardar el Excel en localStorage:', e.message);
+  }
+}
+
+function loadSavedExcel() {
+  try {
+    const b64  = localStorage.getItem(EXCEL_KEY);
+    const name = localStorage.getItem(EXCEL_NAME_KEY) || 'inventario_guardado.xlsx';
+    if (!b64) return;
+
+    showLoading(true); setStatus('Cargando archivo guardado…');
+
+    // Decode base64 → ArrayBuffer
+    const binary = atob(b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const arrayBuf = bytes.buffer;
+
+    const wb = XLSX.read(arrayBuf, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    headers = json[0] ? json[0].map(h => String(h)) : [];
+    rawData = []; discarded = new Set(); comments = {}; responsables = {};
+    selectedYear = null; selectedEmp = null; selectedAlm = null;
+    Object.keys(scrollers).forEach(k => { if(scrollers[k]) { scrollers[k].destroy(); delete scrollers[k]; } });
+    for (let i = 1; i < json.length; i++) {
+      const row = json[i];
+      if (row.every(c => c === '' || c === null || c === undefined)) continue;
+      rawData.push({ _idx: i - 1, _raw: row });
+    }
+    loadPersisted();
+    restoreCommentsByCode();
+    restoreDiscardedByCode();
+
+    showLoading(false);
+    setStatus(`✓ ${name} — ${rawData.length} productos (cargado automáticamente)`);
+    showApp(name);
+    populateFilters(); updateStats();
+    Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
+    tabDirty[activeTab] = false;
+    requestAnimationFrame(() => {
+      if (activeTab==='bdd')            renderBDD();
+      else if (activeTab==='rezagados') renderRezagados();
+      else if (activeTab==='anual')     renderAnual();
+      else if (activeTab==='empresa')   renderEmpresa();
+      else if (activeTab==='stock')     renderStock();
+      else if (activeTab==='plat')      { renderPlat(); updatePlatStats(); }
+      updateGUBadges(); updateInvFisicoBadge();
+    });
+  } catch(e) {
+    showLoading(false);
+    console.warn('No se pudo cargar el Excel guardado:', e.message);
+    // Clear corrupted data
+    try { localStorage.removeItem(EXCEL_KEY); localStorage.removeItem(EXCEL_NAME_KEY); } catch(_) {}
+  }
 }
 
 // ── DATE HELPERS ──────────────────────────────────────────────────────────
