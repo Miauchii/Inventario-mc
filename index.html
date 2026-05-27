@@ -999,8 +999,9 @@ function getVendedor(row) {
 // ── PLATAFORMAS — constants and state defined early so loadPersisted() can use them ──
 const PLAT_KEY      = 'mc_inv_plataformas';
 const COMMENTS_KEY  = 'mc_inv_comments';
-const RESP_KEY      = 'mc_inv_resp';       // { idx_or_codigo: nombre }
-const DISCARDED_KEY = 'mc_inv_discarded';   // Set<codigo> of tachado products
+const RESP_KEY      = 'mc_inv_resp';
+const DISCARDED_KEY = 'mc_inv_discarded';
+const SNAPSHOT_KEY  = 'mc_inv_snapshot';  // { [codigo]: {articulo,almacen,clasif,vendedor,existencia,valorInv,ultCompra} }   // Set<codigo> of tachado products
 
 const PLATS = [
   { key:'ml', label:'Mercado Libre', color:'#ffce44' },
@@ -1056,10 +1057,28 @@ function saveAll() {
     localStorage.setItem(GU_KEY, JSON.stringify(guData));
     // 5. Cobrar data
     localStorage.setItem(COBRAR_KEY, JSON.stringify(cobrarData));
+    // 6. Product snapshot — saves key info so huérfanos can still display after Excel change
+    const snapshot = {};
+    rawData.forEach(row => {
+      const cod = String(row._raw[COL.codigo]||'').trim(); if(!cod) return;
+      snapshot[cod] = {
+        articulo:  String(row._raw[COL.articulo]||''),
+        almacen:   String(row._raw[COL.almacen]||''),
+        clasif:    getClasif(row),
+        vendedor:  getVendedor(row),
+        existencia: parseNum(row._raw[COL.existencia]),
+        valorInv:  parseNum(row._raw[COL.valorInv]),
+        ultCompra: String(row._raw[COL.ultCompra]||''),
+        meses:     calcMeses(row)
+      };
+    });
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
     platDirty = false;
     markClean();
   } catch(e) { alert('No se pudo guardar: ' + e.message); }
 }
+
+let productSnapshot = {};   // loaded from localStorage on init
 
 function loadPersisted() {
   try {
@@ -1069,9 +1088,10 @@ function loadPersisted() {
     if (c) Object.assign(comments, JSON.parse(c));
     const rr = localStorage.getItem(RESP_KEY);
     if (rr) Object.assign(responsables, JSON.parse(rr));
+    const sn = localStorage.getItem(SNAPSHOT_KEY);
+    if (sn) productSnapshot = JSON.parse(sn);
     loadGUData();
     loadCobrarData();
-    // discarded restored by código after rawData is populated — see restoreDiscardedByCode()
   } catch(e) { console.warn('Could not load persisted data', e); }
 }
 
@@ -2612,9 +2632,11 @@ function renderPoEntregar() {
   else scrollers.poentregar = createVirtualScroller(document.getElementById('scrollPoEntregar'), tbody, rows, buildRow, 11);
 
   tfoot.innerHTML=`<tr><td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td></tr>`;
-}
 
-// ── RENDER ENTREGADO A GU ─────────────────────────────────────────────────
+  // Show orphan products (saved state but not in current Excel)
+  const poPanel = document.getElementById('tab-poentregar');
+  renderHuerfanos(poPanel, getHuerfanosPoeEntregar(), 'poentregar');
+}
 function renderEntregadoGU() {
   if (activeTab !== 'entregadogu') { tabDirty.entregadogu=true; return; }
   const search = document.getElementById('searchEntregado').value.toLowerCase();
@@ -2715,9 +2737,11 @@ function renderEntregadoGU() {
     tdU.appendChild(btn); tr.appendChild(tdU);
     tbodyV.appendChild(tr);
   });
-}
 
-// ── INVENTARIO FÍSICO helpers ─────────────────────────────────────────────
+  // Show orphan products (saved state but not in current Excel)
+  const egPanel = document.getElementById('tab-entregadogu');
+  renderHuerfanos(egPanel, getHuerfanosGU(), 'entregadogu');
+}
 function getInvFisicoRows() {
   return rawData.filter(r => {
     if (!isRezagado(r)) return false;
@@ -3051,6 +3075,10 @@ function renderPorCobrar() {
     });
     tbl.appendChild(tbodyD); container.appendChild(tbl);
   });
+
+  // Show orphan products (saved state but not in current Excel)
+  const pcPanel = document.getElementById('tab-porcobrar');
+  renderHuerfanos(pcPanel, getHuerfanosPorCobrar(), 'porcobrar');
 }
 
 function exportPorCobrar() {
@@ -3120,6 +3148,139 @@ function closeTabDropdown() {
 }
 // Close dropdown when clicking anywhere else
 document.addEventListener('click', () => closeTabDropdown());
+
+// ── HUÉRFANOS — productos guardados no encontrados en el Excel actual ─────
+function getCodigosEnRawData() {
+  return new Set(rawData.map(r => String(r._raw[COL.codigo]||'').trim()));
+}
+
+// Returns list of {cod, snap, guEntry, cobrarEntry} for products not in current Excel
+function getHuerfanosGU() {
+  const enExcel = getCodigosEnRawData();
+  return Object.entries(guData)
+    .filter(([cod, e]) => (e.entregado) && !enExcel.has(cod) && productSnapshot[cod])
+    .map(([cod, e]) => ({ cod, snap: productSnapshot[cod], guEntry: e, cobrarEntry: getCobrarEntry(cod) }));
+}
+function getHuerfanosPorCobrar() {
+  const enExcel = getCodigosEnRawData();
+  return Object.entries(cobrarData)
+    .filter(([cod, e]) => e.porcobrar && !enExcel.has(cod) && productSnapshot[cod])
+    .map(([cod, e]) => ({ cod, snap: productSnapshot[cod], cobrarEntry: e, guEntry: getGUEntry(cod) }));
+}
+function getHuerfanosPoeEntregar() {
+  const enExcel = getCodigosEnRawData();
+  return Object.entries(cobrarData)
+    .filter(([cod, e]) => {
+      if (!e.porcobrar || enExcel.has(cod) || !productSnapshot[cod]) return false;
+      const ge = getGUEntry(cod);
+      if (ge.entregado) return false;
+      if (e.desdeInvFisico) return true;
+      return piezasCobradas(cod) > 0;
+    })
+    .map(([cod, e]) => ({ cod, snap: productSnapshot[cod], cobrarEntry: e, guEntry: getGUEntry(cod) }));
+}
+
+// Renders an orphan warning section into a container element
+function renderHuerfanos(containerEl, huerfanos, context) {
+  // Remove any existing orphan section
+  const old = containerEl.querySelector('.huerfanos-section');
+  if (old) old.remove();
+  if (!huerfanos.length) return;
+
+  const section = document.createElement('div');
+  section.className = 'huerfanos-section';
+  section.style.cssText = 'margin-top:24px;border-top:2px dashed rgba(245,158,11,0.4);padding-top:20px;';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;';
+  header.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.1rem;">⚠️</span>
+      <div>
+        <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.82rem;color:var(--amber)">
+          ${huerfanos.length} producto${huerfanos.length!==1?'s':''} no encontrado${huerfanos.length!==1?'s':''} en el Excel actual
+        </div>
+        <div style="font-size:0.68rem;color:var(--text3);margin-top:2px;">
+          Estos productos tienen estado guardado pero no aparecen en el archivo cargado. Su información se muestra desde el último guardado.
+        </div>
+      </div>
+    </div>
+    <span style="font-size:0.62rem;padding:3px 9px;border-radius:4px;background:rgba(245,158,11,0.12);color:var(--amber);border:1px solid rgba(245,158,11,0.3);">DATOS DEL ÚLTIMO GUARDADO</span>`;
+  section.appendChild(header);
+
+  const tbl = document.createElement('table');
+  tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.73rem;border:1px solid rgba(245,158,11,0.25);border-radius:6px;overflow:hidden;';
+  tbl.innerHTML = `<thead><tr style="background:rgba(245,158,11,0.08);">
+    <th style="padding:8px 11px;text-align:left;font-size:0.6rem;color:var(--amber);text-transform:uppercase;letter-spacing:1px;">#</th>
+    <th style="padding:8px 11px;text-align:left;">Código</th>
+    <th style="padding:8px 11px;text-align:left;color:var(--cyan);">Vendedor</th>
+    <th style="padding:8px 11px;text-align:left;">Artículo</th>
+    <th style="padding:8px 11px;text-align:left;">Almacén</th>
+    <th style="padding:8px 11px;text-align:right;">Existencia</th>
+    <th style="padding:8px 11px;text-align:right;">Valor Inv.</th>
+    ${context==='entregadogu' ? '<th style="padding:8px 11px;">Fecha Entrega</th><th style="padding:8px 11px;">Estado</th>' : ''}
+    ${context==='porcobrar'   ? '<th style="padding:8px 11px;color:var(--green);">Piezas cobradas</th><th style="padding:8px 11px;">Fecha Registro</th>' : ''}
+    ${context==='poentregar'  ? '<th style="padding:8px 11px;">Fecha Registro</th><th style="padding:8px 11px;">Origen</th>' : ''}
+    <th style="padding:8px 11px;">↩</th>
+  </tr></thead>`;
+
+  const tbody = document.createElement('tbody');
+  huerfanos.forEach((h, i) => {
+    const tr = document.createElement('tr');
+    tr.style.cssText = 'border-top:1px solid rgba(245,158,11,0.15);opacity:0.85;';
+
+    const cells = [
+      { v: i+1,        s: 'color:var(--text3)' },
+      { v: h.cod,      s: 'font-weight:600;color:var(--amber)' },
+      { v: h.snap.vendedor || '—', s: 'color:var(--cyan);font-size:0.68rem' },
+      { v: h.snap.articulo || '—' },
+      { v: h.snap.almacen  || '—' },
+      { v: fmtNum(h.snap.existencia||0), align: 'right' },
+      { v: fmtMoney(h.snap.valorInv||0), align: 'right' },
+    ];
+
+    if (context === 'entregadogu') {
+      cells.push({ v: h.guEntry.fechaEntrega||'—', s: 'color:var(--cyan)' });
+      cells.push({ v: h.guEntry.vendido ? '✅ Vendido' : '📋 Pendiente', s: h.guEntry.vendido?'color:var(--green)':'color:var(--text2)' });
+    }
+    if (context === 'porcobrar') {
+      cells.push({ v: fmtNum(piezasCobradas(h.cod)), s: 'color:var(--green);font-weight:700', align: 'right' });
+      cells.push({ v: h.cobrarEntry.fechaRegistro||'—', s: 'color:var(--amber)' });
+    }
+    if (context === 'poentregar') {
+      cells.push({ v: h.cobrarEntry.fechaRegistro||'—', s: 'color:var(--amber)' });
+      cells.push({ v: h.cobrarEntry.desdeInvFisico ? '🏭 Inv. Físico' : '⚠️ Rezagados', s: 'color:var(--text2);font-size:0.68rem' });
+    }
+
+    cells.forEach(({v, s, align}) => {
+      const td = document.createElement('td');
+      td.textContent = v;
+      td.style.cssText = `padding:8px 11px;${align?'text-align:'+align+';':''}${s||''}`;
+      tr.appendChild(td);
+    });
+
+    // ↩ Remove from saved state
+    const tdU = document.createElement('td'); tdU.style.padding = '4px 8px';
+    const btn = document.createElement('button'); btn.className='btn btn-ghost'; btn.style.fontSize='0.62rem'; btn.textContent='🗑 Quitar';
+    btn.title = 'Eliminar este registro guardado';
+    btn.addEventListener('click', () => {
+      if (!confirm(`¿Eliminar el registro guardado de "${h.cod}"? No se puede deshacer.`)) return;
+      if (context === 'entregadogu' || context === 'poentregar') { delete guData[h.cod]; saveGUData(); }
+      if (context === 'porcobrar' || context === 'poentregar')   { delete cobrarData[h.cod]; saveCobrarData(); }
+      markDirty();
+      if (context === 'entregadogu') renderEntregadoGU();
+      if (context === 'porcobrar')   renderPorCobrar();
+      if (context === 'poentregar')  renderPoEntregar();
+      updateGUBadges(); updateInvFisicoBadge();
+    });
+    tdU.appendChild(btn); tr.appendChild(tdU);
+    tbody.appendChild(tr);
+  });
+
+  tbl.appendChild(tbody);
+  section.appendChild(tbl);
+  containerEl.appendChild(section);
+}
 
 function switchTab(tab) {
   const analysisTabs = ['anual','empresa','stock'];
