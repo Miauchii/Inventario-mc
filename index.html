@@ -381,12 +381,55 @@ tr.tachado td:first-child { text-decoration: none; }
     <span class="nav-title">Gestor de Inventario Rezagado</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
-    <span id="navFileName" style="display:none;font-size:0.68rem;color:var(--text3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <span id="navFileName" style="display:none;font-size:0.68rem;color:var(--text3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
     <button id="navChangeFile" onclick="document.getElementById('fileInput').click()" style="display:none;background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">📂 Cambiar archivo</button>
+    <button id="navPublishBtn" onclick="openGHModal()" style="display:none;background:none;border:1px solid var(--green);color:var(--green);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Publicar este Excel para que todo el equipo lo vea">☁️ Publicar para todos</button>
     <button id="navSaveBtn" onclick="saveAll()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">💾 Guardar</button>
     <span class="nav-badge">Interno</span>
   </div>
 </nav>
+
+<!-- ═══ GITHUB MODAL ═══════════════════════════════════════ -->
+<div id="ghModal" style="display:none;position:fixed;inset:0;background:rgba(8,9,12,0.92);z-index:400;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);background:var(--surface2);">
+      <span style="font-family:'Barlow',sans-serif;font-weight:700;font-size:1rem;">☁️ Publicar Excel para el equipo</span>
+      <button onclick="closeGHModal()" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:22px;">
+      <div style="font-size:0.78rem;color:var(--text2);margin-bottom:18px;line-height:1.6;">
+        Sube el Excel actual a GitHub para que <strong style="color:var(--text)">todo el equipo lo vea automáticamente</strong> la próxima vez que abran la app. Solo necesitas configurar esto una vez.
+      </div>
+
+      <!-- Config fields -->
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px;">
+        <div>
+          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Usuario de GitHub</div>
+          <input id="ghUser" type="text" placeholder="ej: miauchii" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
+        </div>
+        <div>
+          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Nombre del repositorio</div>
+          <input id="ghRepo" type="text" placeholder="ej: Inventario-mc" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
+        </div>
+        <div>
+          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Token de acceso personal <a href="https://github.com/settings/tokens/new?scopes=repo&description=InventarioMC" target="_blank" style="color:var(--cyan);text-decoration:none;font-size:0.6rem;">→ Generar token</a></div>
+          <input id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
+          <div style="font-size:0.62rem;color:var(--text3);margin-top:4px;">El token se guarda solo en este navegador, nunca se comparte.</div>
+        </div>
+      </div>
+
+      <div id="ghStatus" style="display:none;font-size:0.74rem;padding:10px 14px;border-radius:6px;margin-bottom:14px;"></div>
+
+      <div style="font-size:0.68rem;color:var(--text3);padding:10px 12px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);margin-bottom:18px;">
+        💡 El archivo se guardará como <strong style="color:var(--text2);">inventario.xlsx</strong> en tu repo. Todos los que abran la app lo cargarán automáticamente.
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--border);background:var(--surface2);">
+      <button onclick="closeGHModal()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;">Cancelar</button>
+      <button onclick="publishToGitHub()" id="ghPublishBtn" style="background:linear-gradient(135deg,var(--green),#16a34a);border:none;color:#fff;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;">☁️ Subir y publicar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ MAIN ══════════════════════════════════════════════ -->
 <main>
@@ -1113,8 +1156,15 @@ let rawData = [], headers = [], discarded = new Set(), comments = {}, selectedYe
 // Load any previously saved plataforma data on startup
 loadPersisted();
 
-// Auto-load saved Excel if available
-document.addEventListener('DOMContentLoaded', () => {
+// Auto-load saved Excel if available — tries GitHub first, then localStorage
+document.addEventListener('DOMContentLoaded', async () => {
+  const cfg = getGHConfig();
+  // Try GitHub if config is set
+  if (cfg.user && cfg.repo) {
+    const ok = await fetchExcelFromGitHub();
+    if (ok) return;
+  }
+  // Fallback to localStorage
   if (localStorage.getItem(EXCEL_KEY)) loadSavedExcel();
 });
 
@@ -1175,6 +1225,7 @@ function showApp(fileName) {
   document.getElementById('uploadZone').style.display = 'none';
   document.getElementById('appSection').style.display = 'block';
   document.getElementById('navChangeFile').style.display = 'inline-block';
+  document.getElementById('navPublishBtn').style.display = 'inline-block';
   const nameEl = document.getElementById('navFileName');
   nameEl.textContent = '📄 ' + fileName;
   nameEl.style.display = 'inline';
@@ -2567,6 +2618,162 @@ function exportPlat() {
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheet), 'Plataformas ML');
   XLSX.writeFile(wb, `plataformas_ML_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+// ── GITHUB INTEGRATION ───────────────────────────────────────────────────
+const GH_CONFIG_KEY = 'mc_gh_config'; // { user, repo, token }
+
+function getGHConfig() {
+  try { return JSON.parse(localStorage.getItem(GH_CONFIG_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveGHConfig(cfg) {
+  try { localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg)); } catch(e) {}
+}
+
+function openGHModal() {
+  const cfg = getGHConfig();
+  document.getElementById('ghUser').value  = cfg.user  || '';
+  document.getElementById('ghRepo').value  = cfg.repo  || '';
+  document.getElementById('ghToken').value = cfg.token || '';
+  document.getElementById('ghStatus').style.display = 'none';
+  document.getElementById('ghModal').style.display = 'flex';
+}
+function closeGHModal() {
+  document.getElementById('ghModal').style.display = 'none';
+}
+
+async function publishToGitHub() {
+  const user  = document.getElementById('ghUser').value.trim();
+  const repo  = document.getElementById('ghRepo').value.trim();
+  const token = document.getElementById('ghToken').value.trim();
+  const statusEl = document.getElementById('ghStatus');
+  const btn = document.getElementById('ghPublishBtn');
+
+  if (!user || !repo || !token) {
+    showGHStatus('⚠ Completa todos los campos.', 'amber'); return;
+  }
+  // Save config (token included — stored only locally)
+  saveGHConfig({ user, repo, token });
+
+  // Get the stored Excel b64
+  const b64 = localStorage.getItem(EXCEL_KEY);
+  if (!b64) {
+    showGHStatus('⚠ No hay archivo Excel cargado.', 'amber'); return;
+  }
+
+  btn.disabled = true; btn.textContent = '⏳ Subiendo…';
+  showGHStatus('Conectando con GitHub…', 'text2');
+
+  try {
+    const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/inventario.xlsx`;
+
+    // Check if file already exists (need SHA to update)
+    let sha = null;
+    try {
+      const check = await fetch(apiUrl, {
+        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github+json' }
+      });
+      if (check.ok) { const data = await check.json(); sha = data.sha; }
+    } catch(e) {}
+
+    // Upload file
+    const now = new Date().toLocaleString('es-MX');
+    const body = {
+      message: `Actualizar inventario · ${now}`,
+      content: b64,
+      ...(sha ? { sha } : {})
+    };
+
+    const res = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (res.ok) {
+      showGHStatus('✅ ¡Publicado! El equipo verá el nuevo archivo la próxima vez que abran la app.', 'green');
+      btn.textContent = '✅ Publicado';
+      setTimeout(() => { btn.disabled=false; btn.textContent='☁️ Subir y publicar'; closeGHModal(); }, 2500);
+    } else {
+      const err = await res.json();
+      showGHStatus(`❌ Error ${res.status}: ${err.message}`, 'red');
+      btn.disabled=false; btn.textContent='☁️ Subir y publicar';
+    }
+  } catch(e) {
+    showGHStatus(`❌ Error de red: ${e.message}`, 'red');
+    btn.disabled=false; btn.textContent='☁️ Subir y publicar';
+  }
+}
+
+function showGHStatus(msg, color) {
+  const el = document.getElementById('ghStatus');
+  const colors = { green:'rgba(27,196,125,0.12)', amber:'rgba(245,158,11,0.12)', red:'rgba(232,75,58,0.12)', text2:'var(--surface2)' };
+  const textColors = { green:'var(--green)', amber:'var(--amber)', red:'var(--red)', text2:'var(--text2)' };
+  el.style.display = 'block';
+  el.style.background = colors[color] || colors.text2;
+  el.style.color = textColors[color] || textColors.text2;
+  el.style.border = `1px solid ${textColors[color] || 'var(--border)'}`;
+  el.textContent = msg;
+}
+
+// Auto-fetch inventario.xlsx from GitHub repo on load
+async function fetchExcelFromGitHub() {
+  const cfg = getGHConfig();
+  if (!cfg.user || !cfg.repo) return false;
+
+  try {
+    showLoading(true); setStatus('Descargando inventario del equipo…');
+    // Use raw GitHub URL (no auth needed for public repos)
+    const rawUrl = `https://raw.githubusercontent.com/${cfg.user}/${cfg.repo}/main/inventario.xlsx?t=${Date.now()}`;
+    const res = await fetch(rawUrl);
+    if (!res.ok) { showLoading(false); return false; }
+
+    const arrayBuf = await res.arrayBuffer();
+    const sizeMB = (arrayBuf.byteLength / 1024 / 1024).toFixed(1);
+
+    const wb = XLSX.read(arrayBuf, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    headers = json[0] ? json[0].map(h => String(h)) : [];
+    rawData = []; discarded = new Set(); comments = {}; responsables = {};
+    selectedYear = null; selectedEmp = null; selectedAlm = null;
+    Object.keys(scrollers).forEach(k => { if(scrollers[k]) { scrollers[k].destroy(); delete scrollers[k]; } });
+    for (let i = 1; i < json.length; i++) {
+      const row = json[i];
+      if (row.every(c => c === '' || c === null || c === undefined)) continue;
+      rawData.push({ _idx: i - 1, _raw: row });
+    }
+    loadPersisted();
+    restoreCommentsByCode();
+    restoreDiscardedByCode();
+    // Save locally for offline use
+    saveExcelToStorage(arrayBuf, `inventario.xlsx`);
+
+    showLoading(false);
+    setStatus(`✓ inventario.xlsx (${sizeMB}MB) — ${rawData.length} productos · desde GitHub`);
+    showApp('inventario.xlsx');
+    populateFilters(); updateStats();
+    Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
+    tabDirty[activeTab] = false;
+    requestAnimationFrame(() => {
+      if (activeTab==='bdd')            renderBDD();
+      else if (activeTab==='rezagados') renderRezagados();
+      else if (activeTab==='anual')     renderAnual();
+      else if (activeTab==='empresa')   renderEmpresa();
+      else if (activeTab==='stock')     renderStock();
+      else if (activeTab==='plat')      { renderPlat(); updatePlatStats(); }
+      updateGUBadges(); updateInvFisicoBadge();
+    });
+    return true;
+  } catch(e) {
+    showLoading(false);
+    console.warn('No se pudo descargar desde GitHub:', e.message);
+    return false;
+  }
 }
 
 // ── UI ────────────────────────────────────────────────────────────────────
