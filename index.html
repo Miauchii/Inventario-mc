@@ -398,24 +398,25 @@ tr.tachado td:first-child { text-decoration: none; }
     </div>
     <div style="padding:22px;">
       <div style="font-size:0.78rem;color:var(--text2);margin-bottom:18px;line-height:1.6;">
-        <strong style="color:var(--text)">¿Eres la persona responsable?</strong> Usa <em>Subir y publicar</em> para actualizar el Excel para todo el equipo.<br>
-        <strong style="color:var(--text)">¿Solo quieres conectarte?</strong> Usa <em>Solo guardar config</em> — la app descargará el Excel automáticamente sin que tengas que subir nada.
+        <strong style="color:var(--text)">¿Eres la persona responsable?</strong> Ingresa tu token y usa <em>Subir y publicar</em> para actualizar el Excel para todo el equipo.<br>
+        <strong style="color:var(--text)">¿Solo quieres conectarte?</strong> El repo ya está configurado — usa <em>Solo guardar config</em> y la app descargará el Excel automáticamente.
       </div>
-
       <!-- Config fields -->
       <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px;">
-        <div>
-          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Usuario de GitHub</div>
-          <input id="ghUser" type="text" placeholder="ej: miauchii" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1">
+            <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Usuario de GitHub</div>
+            <input id="ghUser" type="text" placeholder="miauchii" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
+          </div>
+          <div style="flex:1">
+            <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Repositorio</div>
+            <input id="ghRepo" type="text" placeholder="Inventario-mc" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
+          </div>
         </div>
         <div>
-          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Nombre del repositorio</div>
-          <input id="ghRepo" type="text" placeholder="ej: Inventario-mc" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
-        </div>
-        <div>
-          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Token de acceso personal <a href="https://github.com/settings/tokens/new?scopes=repo&description=InventarioMC" target="_blank" style="color:var(--cyan);text-decoration:none;font-size:0.6rem;">→ Generar token</a></div>
-          <input id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
-          <div style="font-size:0.62rem;color:var(--text3);margin-top:4px;">El token se guarda solo en este navegador, nunca se comparte.</div>
+          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Token de acceso personal (solo necesario para publicar) <a href="https://github.com/settings/tokens/new?scopes=repo&description=InventarioMC" target="_blank" style="color:var(--cyan);text-decoration:none;font-size:0.6rem;">→ Generar token</a></div>
+          <input id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx · opcional para solo ver" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
+          <div style="font-size:0.62rem;color:var(--text3);margin-top:4px;">El token se guarda solo en este navegador y es necesario únicamente para subir archivos.</div>
         </div>
       </div>
 
@@ -1166,17 +1167,13 @@ let rawData = [], headers = [], discarded = new Set(), comments = {}, selectedYe
 // Load any previously saved plataforma data on startup
 loadPersisted();
 
-// Auto-load saved Excel if available — tries GitHub first, then localStorage
+// Auto-load: always tries GitHub first (repo is hardcoded), then localStorage fallback
 document.addEventListener('DOMContentLoaded', async () => {
-  const cfg = getGHConfig();
-  // Try GitHub if config is set
-  if (cfg.user && cfg.repo) {
-    const ok = await fetchExcelFromGitHub();
-    if (ok) return;
-  }
-  // Fallback to localStorage
+  const ok = await fetchExcelFromGitHub();
+  if (ok) return;
+  // Fallback: localStorage (for offline or if GitHub fails)
   if (localStorage.getItem(EXCEL_KEY)) { loadSavedExcel(); return; }
-  // Nothing saved — show the quick-config hint bar
+  // Nothing found — show upload zone with quick-config hint
   document.getElementById('ghQuickConfig').style.display = 'flex';
 });
 
@@ -2633,19 +2630,26 @@ function exportPlat() {
 }
 
 // ── GITHUB INTEGRATION ───────────────────────────────────────────────────
-const GH_CONFIG_KEY = 'mc_gh_config'; // { user, repo, token }
+const GH_CONFIG_KEY = 'mc_gh_config';
+
+// DEFAULT repo — hardcoded so any browser loads automatically without setup
+const GH_DEFAULT = { user: 'miauchii', repo: 'Inventario-mc' };
 
 function getGHConfig() {
-  try { return JSON.parse(localStorage.getItem(GH_CONFIG_KEY)) || {}; } catch(e) { return {}; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(GH_CONFIG_KEY)) || {};
+    // Always merge with defaults so user/repo are always set
+    return { ...GH_DEFAULT, ...saved };
+  } catch(e) { return { ...GH_DEFAULT }; }
 }
 function saveGHConfig(cfg) {
-  try { localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg)); } catch(e) {}
+  try { localStorage.setItem(GH_CONFIG_KEY, JSON.stringify({ ...GH_DEFAULT, ...cfg })); } catch(e) {}
 }
 
 function openGHModal() {
   const cfg = getGHConfig();
-  document.getElementById('ghUser').value  = cfg.user  || '';
-  document.getElementById('ghRepo').value  = cfg.repo  || '';
+  document.getElementById('ghUser').value  = cfg.user  || GH_DEFAULT.user;
+  document.getElementById('ghRepo').value  = cfg.repo  || GH_DEFAULT.repo;
   document.getElementById('ghToken').value = cfg.token || '';
   document.getElementById('ghStatus').style.display = 'none';
   document.getElementById('ghModal').style.display = 'flex';
