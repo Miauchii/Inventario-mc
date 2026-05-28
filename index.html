@@ -382,6 +382,7 @@ tr.tachado td:first-child { text-decoration: none; }
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
     <span id="navFileName" style="display:none;font-size:0.68rem;color:var(--text3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <button id="navSyncBtn" onclick="syncData()" style="display:none;background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Sincronizar cambios del equipo">🔄 Sincronizar</button>
     <button id="navChangeFile" onclick="document.getElementById('fileInput').click()" style="display:none;background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">📂 Cambiar archivo</button>
     <button id="navPublishBtn" onclick="openGHModal()" style="display:none;background:none;border:1px solid var(--green);color:var(--green);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Publicar este Excel para que todo el equipo lo vea">☁️ Publicar para todos</button>
     <button id="navSaveBtn" onclick="saveAll()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Guarda localmente y sincroniza con el equipo en GitHub">💾 Guardar</button>
@@ -1136,16 +1137,23 @@ async function publishDatosToGitHub(cfg, sharedData) {
   await pushViaWorker('datos.json', content);
 }
 
-async function fetchDatosFromGitHub() {
+async function fetchDatosFromGitHub(silent = false) {
   const cfg = getGHConfig();
   if (!cfg.user || !cfg.repo) return;
   try {
-    const res = await fetch(
-      `https://raw.githubusercontent.com/${cfg.user}/${cfg.repo}/main/datos.json?nocache=${Date.now()}`,
-      { cache:'no-store' }
-    );
+    // Use GitHub API instead of raw URL — bypasses the 5-min CDN cache
+    const apiUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/datos.json`;
+    const res = await fetch(apiUrl, {
+      headers: { Accept: 'application/vnd.github+json' },
+      cache: 'no-store'
+    });
     if (!res.ok) return;
-    const data = await res.json();
+    const meta = await res.json();
+    if (!meta.content) return;
+    // Decode base64 content
+    const jsonStr = decodeURIComponent(escape(atob(meta.content.replace(/\n/g,''))));
+    const data = JSON.parse(jsonStr);
+
     if (data.comments)     localStorage.setItem(COMMENTS_KEY,  JSON.stringify(data.comments));
     if (data.responsables) localStorage.setItem(RESP_KEY,      JSON.stringify(data.responsables));
     if (data.discarded)    localStorage.setItem(DISCARDED_KEY, JSON.stringify(data.discarded));
@@ -1154,7 +1162,26 @@ async function fetchDatosFromGitHub() {
     if (data.platData)   { localStorage.setItem(PLAT_KEY,      JSON.stringify(data.platData));   Object.assign(platData,   data.platData); }
     restoreCommentsByCode();
     restoreDiscardedByCode();
-    console.log(`✓ datos.json cargado (guardado: ${data.savedAt||'?'})`);
+
+    // Re-render active tab so changes appear immediately
+    if (rawData.length) {
+      updateStats(); updateGUBadges(); updateInvFisicoBadge();
+      Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
+      tabDirty[activeTab] = false;
+      requestAnimationFrame(() => {
+        if (activeTab==='bdd')          renderBDD();
+        else if (activeTab==='rezagados') renderRezagados();
+        else if (activeTab==='porcobrar') renderPorCobrar();
+        else if (activeTab==='poentregar') renderPoEntregar();
+        else if (activeTab==='entregadogu') renderEntregadoGU();
+        else if (activeTab==='invfisico') renderInvFisico();
+        else if (activeTab==='plat')     { renderPlat(); updatePlatStats(); }
+      });
+    }
+
+    const ts = data.savedAt ? new Date(data.savedAt).toLocaleTimeString('es-MX') : '?';
+    if (!silent) console.log(`✓ datos.json sincronizado (guardado: ${ts})`);
+    return ts;
   } catch(e) { console.warn('No se pudo cargar datos.json:', e.message); }
 }
 
@@ -1258,9 +1285,33 @@ function showApp(fileName) {
   document.getElementById('appSection').style.display = 'block';
   document.getElementById('navChangeFile').style.display = 'inline-block';
   document.getElementById('navPublishBtn').style.display = 'inline-block';
+  document.getElementById('navSyncBtn').style.display = 'inline-block';
   const nameEl = document.getElementById('navFileName');
   nameEl.textContent = '📄 ' + fileName;
   nameEl.style.display = 'inline';
+}
+
+async function syncData() {
+  const btn = document.getElementById('navSyncBtn');
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Sincronizando…';
+  btn.disabled = true;
+  btn.style.color = 'var(--amber)';
+  btn.style.borderColor = 'var(--amber)';
+  try {
+    const ts = await fetchDatosFromGitHub(false);
+    btn.textContent = ts ? `✓ ${ts}` : '✓ Al día';
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'var(--green)';
+  } catch(e) {
+    btn.textContent = '⚠ Error';
+    btn.style.color = 'var(--red)';
+    btn.style.borderColor = 'var(--red)';
+  }
+  setTimeout(() => {
+    btn.textContent = orig; btn.disabled = false;
+    btn.style.color = 'var(--text2)'; btn.style.borderColor = 'var(--border2)';
+  }, 3000);
 }
 
 function saveExcelToStorage(arrayBuf, fileName) {
