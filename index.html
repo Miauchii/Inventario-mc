@@ -398,26 +398,14 @@ tr.tachado td:first-child { text-decoration: none; }
     </div>
     <div style="padding:22px;">
       <div style="font-size:0.78rem;color:var(--text2);margin-bottom:18px;line-height:1.6;">
-        <strong style="color:var(--text)">¿Eres la persona responsable?</strong> Ingresa tu token y usa <em>Subir y publicar</em> para actualizar el Excel para todo el equipo.<br>
-        <strong style="color:var(--text)">¿Solo quieres conectarte?</strong> El repo ya está configurado — usa <em>Solo guardar config</em> y la app descargará el Excel automáticamente.
+        <strong style="color:var(--text)">¿Eres la persona responsable?</strong> Usa <em>Subir y publicar</em> para actualizar el Excel para todo el equipo. No necesitas token — el servidor lo maneja automáticamente.<br>
+        <strong style="color:var(--text)">¿Solo quieres conectarte?</strong> El repo ya está configurado — cierra este modal y recarga la página.
       </div>
-      <!-- Config fields -->
-      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px;">
-        <div style="display:flex;gap:10px;">
-          <div style="flex:1">
-            <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Usuario de GitHub</div>
-            <input id="ghUser" type="text" placeholder="miauchii" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
-          </div>
-          <div style="flex:1">
-            <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Repositorio</div>
-            <input id="ghRepo" type="text" placeholder="Inventario-mc" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
-          </div>
-        </div>
-        <div>
-          <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Token de acceso personal (solo necesario para publicar) <a href="https://github.com/settings/tokens/new?scopes=repo&description=InventarioMC" target="_blank" style="color:var(--cyan);text-decoration:none;font-size:0.6rem;">→ Generar token</a></div>
-          <input id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx · opcional para solo ver" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.8rem;padding:8px 12px;border-radius:6px;outline:none;">
-          <div style="font-size:0.62rem;color:var(--text3);margin-top:4px;">El token se guarda solo en este navegador y es necesario únicamente para subir archivos.</div>
-        </div>
+      <!-- Solo info, no se necesita config adicional -->
+      <div style="padding:14px 16px;background:rgba(0,200,224,0.06);border:1px solid rgba(0,200,224,0.2);border-radius:8px;margin-bottom:18px;">
+        <div style="font-size:0.72rem;color:var(--cyan);font-weight:600;margin-bottom:4px;">✓ Conectado a GitHub</div>
+        <div style="font-size:0.7rem;color:var(--text2);">Repositorio: <strong style="color:var(--text)">miauchii/Inventario-mc</strong></div>
+        <div style="font-size:0.7rem;color:var(--text2);margin-top:2px;">Los cambios se sincronizan automáticamente al presionar 💾 Guardar</div>
       </div>
 
       <div id="ghStatus" style="display:none;font-size:0.74rem;padding:10px 14px;border-radius:6px;margin-bottom:14px;"></div>
@@ -428,7 +416,6 @@ tr.tachado td:first-child { text-decoration: none; }
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--border);background:var(--surface2);">
       <button onclick="closeGHModal()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;">Cancelar</button>
-      <button onclick="saveGHConfigOnly()" style="background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;" title="Solo guarda la config — descarga el Excel de GitHub automáticamente">💾 Solo guardar config</button>
       <button onclick="publishToGitHub()" id="ghPublishBtn" style="background:linear-gradient(135deg,var(--green),#16a34a);border:none;color:#fff;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;">☁️ Subir y publicar</button>
     </div>
   </div>
@@ -1134,33 +1121,19 @@ function saveAll() {
     platDirty = false;
     markClean();
 
-    // 7. Publish shared data to GitHub if token is configured
-    const cfg = getGHConfig();
-    if (cfg.token) {
-      const sharedData = {
-        comments: byCode, responsables: byCodeResp,
-        discarded: discardedCodes, guData, cobrarData, platData,
-        savedAt: new Date().toISOString()
-      };
-      publishDatosToGitHub(cfg, sharedData);
-    }
+    // Publish shared data to GitHub via Cloudflare Worker (no token needed)
+    const sharedData = {
+      comments: byCode, responsables: byCodeResp,
+      discarded: discardedCodes, guData, cobrarData, platData,
+      savedAt: new Date().toISOString()
+    };
+    publishDatosToGitHub(getGHConfig(), sharedData);
   } catch(e) { alert('No se pudo guardar: ' + e.message); }
 }
 
 async function publishDatosToGitHub(cfg, sharedData) {
-  try {
-    const apiUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/datos.json`;
-    const hdrs = { Authorization:`token ${cfg.token}`, Accept:'application/vnd.github+json', 'Content-Type':'application/json' };
-    let sha = null;
-    try { const r=await fetch(apiUrl,{headers:hdrs}); if(r.ok){const d=await r.json();sha=d.sha;} } catch(e){}
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(sharedData))));
-    const res = await fetch(apiUrl, {
-      method:'PUT', headers:hdrs,
-      body: JSON.stringify({ message:`Actualizar datos · ${new Date().toLocaleString('es-MX')}`, content, ...(sha?{sha}:{}) })
-    });
-    if(res.ok) console.log('✓ datos.json publicado en GitHub');
-    else { const e=await res.json(); console.warn('Error publicando datos:', e.message); }
-  } catch(e) { console.warn('No se pudo publicar datos.json:', e.message); }
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(sharedData))));
+  await pushViaWorker('datos.json', content);
 }
 
 async function fetchDatosFromGitHub() {
@@ -2685,6 +2658,28 @@ const GH_CONFIG_KEY = 'mc_gh_config';
 // DEFAULT repo — hardcoded so any browser loads automatically without setup
 const GH_DEFAULT = { user: 'miauchii', repo: 'Inventario-mc' };
 
+// ── CLOUDFLARE WORKER URL ─────────────────────────────────────────────────
+const WORKER_URL = 'https://mc-inventario.miauchimorales.workers.dev';
+
+async function pushViaWorker(file, content) {
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, content })
+    });
+    const data = await res.json();
+    if (data.ok) console.log(`✓ ${file} publicado via Worker`);
+    else console.warn(`Worker error ${data.status} publicando ${file}`);
+    return data.ok;
+  } catch(e) {
+    console.warn('No se pudo contactar el Worker:', e.message);
+    return false;
+  }
+}
+
+
+
 function getGHConfig() {
   try {
     const saved = JSON.parse(localStorage.getItem(GH_CONFIG_KEY)) || {};
@@ -2733,71 +2728,41 @@ async function publishToGitHub() {
   const statusEl = document.getElementById('ghStatus');
   const btn = document.getElementById('ghPublishBtn');
 
-  if (!user || !repo || !token) {
-    showGHStatus('⚠ Completa todos los campos.', 'amber'); return;
+  if (!rawData.length) {
+    showGHStatus('⚠ No hay archivo Excel cargado en la app.', 'amber'); return;
   }
-  // Save config (token included — stored only locally)
-  saveGHConfig({ user, repo, token });
 
-  // Re-generate a fresh Excel from current rawData to ensure clean binary
+  // Re-generate clean Excel from current rawData
   btn.disabled = true; btn.textContent = '⏳ Preparando archivo…';
   showGHStatus('Generando Excel…', 'text2');
 
-  // Build workbook from current rawData
   let b64;
   try {
     const wb2 = XLSX.utils.book_new();
-    const aoa = [headers.length ? headers : Object.keys(rawData[0]?._raw||{})];
+    const aoa = [headers.length ? headers : []];
     rawData.forEach(row => aoa.push(row._raw));
     XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet(aoa), 'Inventario');
-    // Write as base64 directly — this is clean binary-to-base64
     b64 = XLSX.write(wb2, { bookType: 'xlsx', type: 'base64' });
   } catch(e) {
-    showGHStatus('⚠ No hay archivo Excel cargado en la app.', 'amber');
+    showGHStatus('⚠ Error generando el Excel.', 'amber');
     btn.disabled=false; btn.textContent='☁️ Subir y publicar'; return;
   }
 
   btn.textContent = '⏳ Subiendo…';
-  showGHStatus('Conectando con GitHub…', 'text2');
+  showGHStatus('Enviando al servidor…', 'text2');
 
   try {
-    const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/inventario.xlsx`;
-
-    // Get SHA if file exists (needed to update)
-    let sha = null;
-    try {
-      const check = await fetch(apiUrl, {
-        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github+json' }
-      });
-      if (check.ok) { const data = await check.json(); sha = data.sha; }
-    } catch(e) {}
-
-    const now = new Date().toLocaleString('es-MX');
-    const res = await fetch(apiUrl, {
-      method: 'PUT',
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: `Actualizar inventario · ${now}`,
-        content: b64,
-        ...(sha ? { sha } : {})
-      })
-    });
-
-    if (res.ok) {
+    const ok = await pushViaWorker('inventario.xlsx', b64);
+    if (ok) {
       showGHStatus('✅ ¡Publicado! El equipo verá el nuevo archivo la próxima vez que abran la app.', 'green');
       btn.textContent = '✅ Publicado';
       setTimeout(() => { btn.disabled=false; btn.textContent='☁️ Subir y publicar'; closeGHModal(); }, 2500);
     } else {
-      const err = await res.json();
-      showGHStatus(`❌ Error ${res.status}: ${err.message}`, 'red');
+      showGHStatus('❌ No se pudo publicar. Verifica que el Worker esté activo.', 'red');
       btn.disabled=false; btn.textContent='☁️ Subir y publicar';
     }
   } catch(e) {
-    showGHStatus(`❌ Error de red: ${e.message}`, 'red');
+    showGHStatus(`❌ Error: ${e.message}`, 'red');
     btn.disabled=false; btn.textContent='☁️ Subir y publicar';
   }
 }
