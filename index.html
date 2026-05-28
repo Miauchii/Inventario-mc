@@ -385,12 +385,53 @@ tr.tachado td:first-child { text-decoration: none; }
     <button id="navSyncBtn" onclick="syncData()" style="display:none;background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Sincronizar cambios del equipo">🔄 Sincronizar</button>
     <button id="navChangeFile" onclick="document.getElementById('fileInput').click()" style="display:none;background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">📂 Cambiar archivo</button>
     <button id="navPublishBtn" onclick="openGHModal()" style="display:none;background:none;border:1px solid var(--green);color:var(--green);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Publicar este Excel para que todo el equipo lo vea">☁️ Publicar para todos</button>
+    <button id="navResetBtn" onclick="openResetModal()" style="display:none;background:none;border:1px solid var(--red);color:var(--red);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Reiniciar todo el historial">🗑 Reiniciar</button>
     <button id="navSaveBtn" onclick="saveAll()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Guarda localmente y sincroniza con el equipo en GitHub">💾 Guardar</button>
     <span class="nav-badge">Interno</span>
   </div>
 </nav>
 
-<!-- ═══ GITHUB MODAL ═══════════════════════════════════════ -->
+<!-- ═══ RESET MODAL ════════════════════════════════════════ -->
+<div id="resetModal" style="display:none;position:fixed;inset:0;background:rgba(8,9,12,0.92);z-index:400;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border:1px solid rgba(232,75,58,0.4);border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);background:rgba(232,75,58,0.08);">
+      <span style="font-family:'Barlow',sans-serif;font-weight:700;font-size:1rem;color:var(--red);">🗑 Reiniciar historial</span>
+      <button onclick="closeResetModal()" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:22px;">
+      <div style="font-size:0.8rem;color:var(--text2);margin-bottom:18px;line-height:1.7;padding:12px 14px;background:rgba(232,75,58,0.06);border:1px solid rgba(232,75,58,0.2);border-radius:8px;">
+        ⚠️ Esta acción <strong style="color:var(--red)">borrará permanentemente</strong> todo el historial:<br>
+        tachados, cobros, GU entregados/vendidos, comentarios, responsables y plataformas.<br>
+        <strong style="color:var(--text)">No se puede deshacer.</strong>
+      </div>
+
+      <!-- Checkboxes de qué reiniciar -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-weight:600;">¿Qué deseas reiniciar?</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetRez"  checked style="accent-color:var(--red)"> Rezagados tachados</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetCobr" checked style="accent-color:var(--red)"> Por Cobrar e historial de cobros</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetGU"   checked style="accent-color:var(--red)"> GU Por Entregar y Entregado a GU</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetPlat" checked style="accent-color:var(--red)"> Plataformas (piezas ML)</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetComm" checked style="accent-color:var(--red)"> Comentarios y Responsables</label>
+        </div>
+      </div>
+
+      <!-- Contraseña -->
+      <div>
+        <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:600;">Contraseña de administrador</div>
+        <input type="password" id="resetPassword" placeholder="Ingresa la contraseña…"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.82rem;padding:9px 12px;border-radius:6px;outline:none;"
+          onkeydown="if(event.key==='Enter') doReset()">
+        <div id="resetError" style="display:none;font-size:0.7rem;color:var(--red);margin-top:6px;">❌ Contraseña incorrecta</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--border);background:var(--surface2);">
+      <button onclick="closeResetModal()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;">Cancelar</button>
+      <button onclick="doReset()" style="background:var(--red);border:none;color:#fff;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;">🗑 Reiniciar ahora</button>
+    </div>
+  </div>
+</div>
 <div id="ghModal" style="display:none;position:fixed;inset:0;background:rgba(8,9,12,0.92);z-index:400;align-items:center;justify-content:center;padding:20px;">
   <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);background:var(--surface2);">
@@ -822,7 +863,7 @@ tr.tachado td:first-child { text-decoration: none; }
           <th style="color:var(--cyan)">Vendedor</th><th>Artículo</th>
           <th>Clasificación</th><th>Fecha Entrega</th>
           <th class="r">Meses Rezago</th><th class="r">Existencia</th>
-          <th class="r">Valor Inv.</th><th>Comentario</th>
+          <th class="r">Valor Inv.</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th><th>↩</th>
         </tr></thead>
         <tbody id="tbodyEntregado"></tbody>
         <tfoot id="tfootEntregado"></tfoot>
@@ -1286,9 +1327,83 @@ function showApp(fileName) {
   document.getElementById('navChangeFile').style.display = 'inline-block';
   document.getElementById('navPublishBtn').style.display = 'inline-block';
   document.getElementById('navSyncBtn').style.display = 'inline-block';
+  document.getElementById('navResetBtn').style.display = 'inline-block';
   const nameEl = document.getElementById('navFileName');
   nameEl.textContent = '📄 ' + fileName;
   nameEl.style.display = 'inline';
+}
+
+// ── RESET MODAL ───────────────────────────────────────────────────────────
+// Password is stored as a simple hash — change 'MC2026admin' to whatever you want
+const RESET_PASS = 'MC2026admin';
+
+function openResetModal() {
+  document.getElementById('resetPassword').value = '';
+  document.getElementById('resetError').style.display = 'none';
+  document.getElementById('resetModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('resetPassword').focus(), 100);
+}
+function closeResetModal() {
+  document.getElementById('resetModal').style.display = 'none';
+}
+
+function doReset() {
+  const pass = document.getElementById('resetPassword').value;
+  const errEl = document.getElementById('resetError');
+
+  if (pass !== RESET_PASS) {
+    errEl.style.display = 'block';
+    document.getElementById('resetPassword').style.borderColor = 'var(--red)';
+    setTimeout(() => {
+      document.getElementById('resetPassword').style.borderColor = 'var(--border2)';
+    }, 1500);
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const rezCk   = document.getElementById('resetRez').checked;
+  const cobrCk  = document.getElementById('resetCobr').checked;
+  const guCk    = document.getElementById('resetGU').checked;
+  const platCk  = document.getElementById('resetPlat').checked;
+  const commCk  = document.getElementById('resetComm').checked;
+
+  // Reset selected sections
+  if (rezCk)  { discarded = new Set(); localStorage.removeItem(DISCARDED_KEY); }
+  if (cobrCk) { cobrarData = {};        localStorage.removeItem(COBRAR_KEY); saveCobrarData(); }
+  if (guCk)   { guData = {};            localStorage.removeItem(GU_KEY);     saveGUData(); }
+  if (platCk) { platData = {};          localStorage.removeItem(PLAT_KEY); }
+  if (commCk) { comments = {}; responsables = {}; localStorage.removeItem(COMMENTS_KEY); localStorage.removeItem(RESP_KEY); }
+
+  // Clear undo stacks for reset sections
+  if (rezCk)  { undoStacks.rezagados = []; }
+  if (cobrCk) { undoStacks.porcobrar = []; undoStacks.invfisico = []; }
+  if (guCk)   { undoStacks.poentregar = []; undoStacks.entregadogu = []; }
+
+  closeResetModal();
+
+  // Re-render everything
+  updateStats(); updateGUBadges(); updateInvFisicoBadge();
+  Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
+  tabDirty[activeTab] = false;
+  requestAnimationFrame(() => {
+    if (activeTab==='bdd')          renderBDD();
+    else if (activeTab==='rezagados') renderRezagados();
+    else if (activeTab==='porcobrar') renderPorCobrar();
+    else if (activeTab==='poentregar') renderPoEntregar();
+    else if (activeTab==='entregadogu') renderEntregadoGU();
+    else if (activeTab==='invfisico') renderInvFisico();
+    else if (activeTab==='plat')    { renderPlat(); updatePlatStats(); }
+  });
+
+  // Sync reset to GitHub so team also sees clean state
+  markDirty();
+  saveAll();
+
+  // Show confirmation
+  const btn = document.getElementById('navResetBtn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ Reiniciado'; btn.style.color='var(--green)'; btn.style.borderColor='var(--green)';
+  setTimeout(() => { btn.textContent=orig; btn.style.color='var(--red)'; btn.style.borderColor='var(--red)'; }, 3000);
 }
 
 async function syncData() {
@@ -3123,12 +3238,29 @@ function renderEntregadoGU() {
       const tdEx=document.createElement('td'); tdEx.className='r'; tdEx.textContent=fmtNum(parseNum(row._raw[COL.existencia])); tr.appendChild(tdEx);
       const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(parseNum(row._raw[COL.valorInv])); tr.appendChild(tdV);
       tr.appendChild(makeCommentCell(row._idx));
+      tr.appendChild(makeResponsableCell(row._idx));
+
+      // ↩ Regresar al inventario
+      const tdR=document.createElement('td');
+      const btnR=document.createElement('button');
+      btnR.className='btn btn-ghost';
+      btnR.style.cssText='font-size:0.62rem;padding:4px 8px;white-space:nowrap;border-color:var(--amber);color:var(--amber);';
+      btnR.textContent='↩ Regresar';
+      btnR.title='Regresar al inventario — deshace la entrega a GU';
+      btnR.addEventListener('click',()=>{
+        pushUndo('entregadogu',{guData:JSON.parse(JSON.stringify(guData))});
+        e.entregado=false; e.fechaEntrega='';
+        saveGUData(); markDirty();
+        renderEntregadoGU(); updateGUBadges();
+        if(activeTab==='poentregar') renderPoEntregar();
+      });
+      tdR.appendChild(btnR); tr.appendChild(tdR);
       return tr;
     };
 
     if (scrollers.entregado) scrollers.entregado.setRows(pendRows);
-    else scrollers.entregado = createVirtualScroller(document.getElementById('scrollEntregado'), tbody, pendRows, buildPendRow, 11);
-    tfoot.innerHTML=`<tr><td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td></tr>`;
+    else scrollers.entregado = createVirtualScroller(document.getElementById('scrollEntregado'), tbody, pendRows, buildPendRow, 13);
+    tfoot.innerHTML=`<tr><td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td><td></td><td></td></tr>`;
   }
 
   // ── VENDIDOS ──
