@@ -2689,19 +2689,31 @@ async function publishToGitHub() {
   // Save config (token included — stored only locally)
   saveGHConfig({ user, repo, token });
 
-  // Get the stored Excel b64
-  const b64 = localStorage.getItem(EXCEL_KEY);
-  if (!b64) {
-    showGHStatus('⚠ No hay archivo Excel cargado.', 'amber'); return;
+  // Re-generate a fresh Excel from current rawData to ensure clean binary
+  btn.disabled = true; btn.textContent = '⏳ Preparando archivo…';
+  showGHStatus('Generando Excel…', 'text2');
+
+  // Build workbook from current rawData
+  let b64;
+  try {
+    const wb2 = XLSX.utils.book_new();
+    const aoa = [headers.length ? headers : Object.keys(rawData[0]?._raw||{})];
+    rawData.forEach(row => aoa.push(row._raw));
+    XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet(aoa), 'Inventario');
+    // Write as base64 directly — this is clean binary-to-base64
+    b64 = XLSX.write(wb2, { bookType: 'xlsx', type: 'base64' });
+  } catch(e) {
+    showGHStatus('⚠ No hay archivo Excel cargado en la app.', 'amber');
+    btn.disabled=false; btn.textContent='☁️ Subir y publicar'; return;
   }
 
-  btn.disabled = true; btn.textContent = '⏳ Subiendo…';
+  btn.textContent = '⏳ Subiendo…';
   showGHStatus('Conectando con GitHub…', 'text2');
 
   try {
     const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/inventario.xlsx`;
 
-    // Check if file already exists (need SHA to update)
+    // Get SHA if file exists (needed to update)
     let sha = null;
     try {
       const check = await fetch(apiUrl, {
@@ -2710,14 +2722,7 @@ async function publishToGitHub() {
       if (check.ok) { const data = await check.json(); sha = data.sha; }
     } catch(e) {}
 
-    // Upload file
     const now = new Date().toLocaleString('es-MX');
-    const body = {
-      message: `Actualizar inventario · ${now}`,
-      content: b64,
-      ...(sha ? { sha } : {})
-    };
-
     const res = await fetch(apiUrl, {
       method: 'PUT',
       headers: {
@@ -2725,7 +2730,11 @@ async function publishToGitHub() {
         Accept: 'application/vnd.github+json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        message: `Actualizar inventario · ${now}`,
+        content: b64,
+        ...(sha ? { sha } : {})
+      })
     });
 
     if (res.ok) {
@@ -2762,33 +2771,22 @@ async function fetchExcelFromGitHub() {
   try {
     showLoading(true); setStatus('Descargando inventario del equipo…');
 
-    // Use GitHub Contents API — returns proper metadata including download_url
-    const apiUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/inventario.xlsx`;
-    const headers = { Accept: 'application/vnd.github+json' };
-    if (cfg.token) headers.Authorization = `token ${cfg.token}`;
+    // raw.githubusercontent.com supports CORS and returns the actual binary
+    const rawUrl = `https://raw.githubusercontent.com/${cfg.user}/${cfg.repo}/main/inventario.xlsx?nocache=${Date.now()}`;
+    const res = await fetch(rawUrl, { cache: 'no-store' });
+    if (!res.ok) { showLoading(false); return false; }
 
-    const metaRes = await fetch(apiUrl, { headers });
-    if (!metaRes.ok) { showLoading(false); return false; }
-    const meta = await metaRes.json();
+    const arrayBuf = await res.arrayBuffer();
 
-    let arrayBuf;
-    if (meta.content) {
-      // Small file — content is inline base64
-      const b64clean = meta.content.replace(/\n/g, '');
-      const binary   = atob(b64clean);
-      const bytes    = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      arrayBuf = bytes.buffer;
-    } else if (meta.download_url) {
-      // Large file — fetch from download_url directly
-      const dlRes = await fetch(meta.download_url);
-      if (!dlRes.ok) { showLoading(false); return false; }
-      arrayBuf = await dlRes.arrayBuffer();
-    } else {
+    // Validate it's actually an xlsx (starts with PK magic bytes)
+    const header = new Uint8Array(arrayBuf.slice(0, 4));
+    const isPK = header[0]===0x50 && header[1]===0x4B;
+    if (!isPK) {
+      console.warn('Archivo descargado no parece ser un .xlsx válido');
       showLoading(false); return false;
     }
 
-    const sizeMB = (arrayBuf.byteLength / 1024 / 1024).toFixed(1);
+    const sizeMB = (arrayBuf.byteLength / 1024 / 1024).toFixed(2);
     const wb = XLSX.read(arrayBuf, { type: 'array', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
@@ -2804,7 +2802,6 @@ async function fetchExcelFromGitHub() {
     loadPersisted();
     restoreCommentsByCode();
     restoreDiscardedByCode();
-    // Save locally for offline fallback
     saveExcelToStorage(arrayBuf, 'inventario.xlsx');
 
     showLoading(false);
