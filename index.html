@@ -2410,14 +2410,14 @@ function doCopy() {
   ];
 
   // Build HTML table styled for Outlook (inline styles only)
-  const headerBg  = '#0d1220';
-  const headerClr = '#00c8e0';
-  const rowOdd    = '#10121a';
-  const rowEven   = '#13162b';
-  const border    = '#252c3f';
-  const textClr   = '#e8ecf4';
-  const rezClr    = '#e84b3a';
-  const okClr     = '#1bc47d';
+  const headerBg  = '#1a3a5c';
+  const headerClr = '#ffffff';
+  const rowOdd    = '#ffffff';
+  const rowEven   = '#f4f7fb';
+  const border    = '#d0d7e3';
+  const textClr   = '#1a1a2e';
+  const rezClr    = '#c0392b';
+  const okClr     = '#1a7f4b';
 
   let html = `<table border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11px;width:100%;min-width:900px;">`;
   // Header
@@ -2436,7 +2436,7 @@ function doCopy() {
       const val = String(c.fn(row));
       let color = textClr;
       if (c.label==='Estado')   color = rez ? rezClr : okClr;
-      if (c.label==='Vendedor') color = '#00c8e0';
+      if (c.label==='Vendedor') color = '#0055a5';
       if (c.label==='Meses Rezago' && rez) color = rezClr;
       html += `<td style="background:${bg};color:${color};padding:6px 10px;border:1px solid ${border};white-space:nowrap">${val}</td>`;
     });
@@ -2465,12 +2465,12 @@ function doCopy() {
 
   const fullHtml = `
     <div style="font-family:Calibri,Arial,sans-serif;margin-bottom:12px">
-      <p style="font-size:14px;font-weight:700;color:#0d1220;margin:0 0 4px">Inventario MC Microcomputación — ${fecha}</p>
-      ${filtros ? `<p style="font-size:11px;color:#525d7a;margin:0 0 10px">${filtros}</p>` : ''}
-      <p style="font-size:11px;color:#525d7a;margin:0 0 10px">${rows.length.toLocaleString('es-MX')} productos · Valor total: ${fmtMoney(totalValor)}</p>
+      <p style="font-size:14px;font-weight:700;color:#1a3a5c;margin:0 0 4px">Inventario MC Microcomputación — ${fecha}</p>
+      ${filtros ? `<p style="font-size:11px;color:#555;margin:0 0 10px">${filtros}</p>` : ''}
+      <p style="font-size:11px;color:#555;margin:0 0 10px">${rows.length.toLocaleString('es-MX')} productos · Valor total: ${fmtMoney(totalValor)}</p>
     </div>
     ${html}
-    <p style="font-size:10px;color:#888;margin-top:8px;font-family:Calibri,Arial,sans-serif">Generado desde Gestor de Inventario · MC Microcomputación</p>`;
+    <p style="font-size:10px;color:#999;margin-top:8px;font-family:Calibri,Arial,sans-serif">Generado desde Gestor de Inventario · MC Microcomputación</p>`;
 
   // Copy using ClipboardItem (HTML)
   try {
