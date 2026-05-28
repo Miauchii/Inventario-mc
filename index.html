@@ -398,7 +398,8 @@ tr.tachado td:first-child { text-decoration: none; }
     </div>
     <div style="padding:22px;">
       <div style="font-size:0.78rem;color:var(--text2);margin-bottom:18px;line-height:1.6;">
-        Sube el Excel actual a GitHub para que <strong style="color:var(--text)">todo el equipo lo vea automáticamente</strong> la próxima vez que abran la app. Solo necesitas configurar esto una vez.
+        <strong style="color:var(--text)">¿Eres la persona responsable?</strong> Usa <em>Subir y publicar</em> para actualizar el Excel para todo el equipo.<br>
+        <strong style="color:var(--text)">¿Solo quieres conectarte?</strong> Usa <em>Solo guardar config</em> — la app descargará el Excel automáticamente sin que tengas que subir nada.
       </div>
 
       <!-- Config fields -->
@@ -426,6 +427,7 @@ tr.tachado td:first-child { text-decoration: none; }
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--border);background:var(--surface2);">
       <button onclick="closeGHModal()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;">Cancelar</button>
+      <button onclick="saveGHConfigOnly()" style="background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;" title="Solo guarda la config — descarga el Excel de GitHub automáticamente">💾 Solo guardar config</button>
       <button onclick="publishToGitHub()" id="ghPublishBtn" style="background:linear-gradient(135deg,var(--green),#16a34a);border:none;color:#fff;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;">☁️ Subir y publicar</button>
     </div>
   </div>
@@ -440,6 +442,14 @@ tr.tachado td:first-child { text-decoration: none; }
     <div class="upload-title">Arrastra tu Excel aquí o haz clic para seleccionar</div>
     <div class="upload-sub" style="margin-top:6px">Formato .xlsx · El archivo se guarda automáticamente para la próxima visita</div>
     <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+  <!-- GitHub quick-config for new browsers -->
+  <div id="ghQuickConfig" style="display:none;margin-top:14px;padding:14px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div>
+      <div style="font-size:0.75rem;color:var(--text);font-weight:600;margin-bottom:3px;">☁️ ¿Tu equipo ya tiene un Excel publicado en GitHub?</div>
+      <div style="font-size:0.68rem;color:var(--text2);">Configura el repositorio una vez y la app lo cargará automáticamente sin pedir el archivo.</div>
+    </div>
+    <button onclick="openGHModal();event.stopPropagation()" style="background:linear-gradient(135deg,var(--cyan),var(--blue2));border:none;color:#000;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:700;padding:8px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;">⚙️ Configurar GitHub</button>
   </div>
   <div id="statusBar"><div class="status-dot"></div><span id="statusText">Cargando…</span></div>
 
@@ -1165,7 +1175,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (ok) return;
   }
   // Fallback to localStorage
-  if (localStorage.getItem(EXCEL_KEY)) loadSavedExcel();
+  if (localStorage.getItem(EXCEL_KEY)) { loadSavedExcel(); return; }
+  // Nothing saved — show the quick-config hint bar
+  document.getElementById('ghQuickConfig').style.display = 'flex';
 });
 
 // ── FILE ──────────────────────────────────────────────────────────────────
@@ -2640,6 +2652,24 @@ function openGHModal() {
 }
 function closeGHModal() {
   document.getElementById('ghModal').style.display = 'none';
+}
+
+async function saveGHConfigOnly() {
+  const user  = document.getElementById('ghUser').value.trim();
+  const repo  = document.getElementById('ghRepo').value.trim();
+  const token = document.getElementById('ghToken').value.trim();
+  if (!user || !repo) { showGHStatus('⚠ Completa usuario y repositorio.', 'amber'); return; }
+  saveGHConfig({ user, repo, token });
+  showGHStatus('✅ Configuración guardada. Descargando Excel…', 'green');
+  setTimeout(async () => {
+    closeGHModal();
+    document.getElementById('ghQuickConfig').style.display = 'none';
+    const ok = await fetchExcelFromGitHub();
+    if (!ok) {
+      document.getElementById('ghQuickConfig').style.display = 'flex';
+      setStatus('⚠ No se encontró inventario.xlsx en el repo. Carga el archivo manualmente o pide a la persona responsable que lo publique.');
+    }
+  }, 1000);
 }
 
 async function publishToGitHub() {
