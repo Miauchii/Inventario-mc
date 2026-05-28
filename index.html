@@ -2761,14 +2761,34 @@ async function fetchExcelFromGitHub() {
 
   try {
     showLoading(true); setStatus('Descargando inventario del equipo…');
-    // Use raw GitHub URL (no auth needed for public repos)
-    const rawUrl = `https://raw.githubusercontent.com/${cfg.user}/${cfg.repo}/main/inventario.xlsx?t=${Date.now()}`;
-    const res = await fetch(rawUrl);
-    if (!res.ok) { showLoading(false); return false; }
 
-    const arrayBuf = await res.arrayBuffer();
+    // Use GitHub Contents API — returns proper metadata including download_url
+    const apiUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/inventario.xlsx`;
+    const headers = { Accept: 'application/vnd.github+json' };
+    if (cfg.token) headers.Authorization = `token ${cfg.token}`;
+
+    const metaRes = await fetch(apiUrl, { headers });
+    if (!metaRes.ok) { showLoading(false); return false; }
+    const meta = await metaRes.json();
+
+    let arrayBuf;
+    if (meta.content) {
+      // Small file — content is inline base64
+      const b64clean = meta.content.replace(/\n/g, '');
+      const binary   = atob(b64clean);
+      const bytes    = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      arrayBuf = bytes.buffer;
+    } else if (meta.download_url) {
+      // Large file — fetch from download_url directly
+      const dlRes = await fetch(meta.download_url);
+      if (!dlRes.ok) { showLoading(false); return false; }
+      arrayBuf = await dlRes.arrayBuffer();
+    } else {
+      showLoading(false); return false;
+    }
+
     const sizeMB = (arrayBuf.byteLength / 1024 / 1024).toFixed(1);
-
     const wb = XLSX.read(arrayBuf, { type: 'array', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
@@ -2784,8 +2804,8 @@ async function fetchExcelFromGitHub() {
     loadPersisted();
     restoreCommentsByCode();
     restoreDiscardedByCode();
-    // Save locally for offline use
-    saveExcelToStorage(arrayBuf, `inventario.xlsx`);
+    // Save locally for offline fallback
+    saveExcelToStorage(arrayBuf, 'inventario.xlsx');
 
     showLoading(false);
     setStatus(`✓ inventario.xlsx (${sizeMB}MB) — ${rawData.length} productos · desde GitHub`);
