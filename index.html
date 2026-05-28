@@ -384,7 +384,7 @@ tr.tachado td:first-child { text-decoration: none; }
     <span id="navFileName" style="display:none;font-size:0.68rem;color:var(--text3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
     <button id="navChangeFile" onclick="document.getElementById('fileInput').click()" style="display:none;background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">📂 Cambiar archivo</button>
     <button id="navPublishBtn" onclick="openGHModal()" style="display:none;background:none;border:1px solid var(--green);color:var(--green);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Publicar este Excel para que todo el equipo lo vea">☁️ Publicar para todos</button>
-    <button id="navSaveBtn" onclick="saveAll()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">💾 Guardar</button>
+    <button id="navSaveBtn" onclick="saveAll()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Guarda localmente y sincroniza con el equipo en GitHub">💾 Guardar</button>
     <span class="nav-badge">Interno</span>
   </div>
 </nav>
@@ -1115,7 +1115,7 @@ function saveAll() {
     localStorage.setItem(GU_KEY, JSON.stringify(guData));
     // 5. Cobrar data
     localStorage.setItem(COBRAR_KEY, JSON.stringify(cobrarData));
-    // 6. Product snapshot — saves key info so huérfanos can still display after Excel change
+    // 6. Product snapshot
     const snapshot = {};
     rawData.forEach(row => {
       const cod = String(row._raw[COL.codigo]||'').trim(); if(!cod) return;
@@ -1133,7 +1133,56 @@ function saveAll() {
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
     platDirty = false;
     markClean();
+
+    // 7. Publish shared data to GitHub if token is configured
+    const cfg = getGHConfig();
+    if (cfg.token) {
+      const sharedData = {
+        comments: byCode, responsables: byCodeResp,
+        discarded: discardedCodes, guData, cobrarData, platData,
+        savedAt: new Date().toISOString()
+      };
+      publishDatosToGitHub(cfg, sharedData);
+    }
   } catch(e) { alert('No se pudo guardar: ' + e.message); }
+}
+
+async function publishDatosToGitHub(cfg, sharedData) {
+  try {
+    const apiUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/datos.json`;
+    const hdrs = { Authorization:`token ${cfg.token}`, Accept:'application/vnd.github+json', 'Content-Type':'application/json' };
+    let sha = null;
+    try { const r=await fetch(apiUrl,{headers:hdrs}); if(r.ok){const d=await r.json();sha=d.sha;} } catch(e){}
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(sharedData))));
+    const res = await fetch(apiUrl, {
+      method:'PUT', headers:hdrs,
+      body: JSON.stringify({ message:`Actualizar datos · ${new Date().toLocaleString('es-MX')}`, content, ...(sha?{sha}:{}) })
+    });
+    if(res.ok) console.log('✓ datos.json publicado en GitHub');
+    else { const e=await res.json(); console.warn('Error publicando datos:', e.message); }
+  } catch(e) { console.warn('No se pudo publicar datos.json:', e.message); }
+}
+
+async function fetchDatosFromGitHub() {
+  const cfg = getGHConfig();
+  if (!cfg.user || !cfg.repo) return;
+  try {
+    const res = await fetch(
+      `https://raw.githubusercontent.com/${cfg.user}/${cfg.repo}/main/datos.json?nocache=${Date.now()}`,
+      { cache:'no-store' }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.comments)     localStorage.setItem(COMMENTS_KEY,  JSON.stringify(data.comments));
+    if (data.responsables) localStorage.setItem(RESP_KEY,      JSON.stringify(data.responsables));
+    if (data.discarded)    localStorage.setItem(DISCARDED_KEY, JSON.stringify(data.discarded));
+    if (data.guData)     { localStorage.setItem(GU_KEY,        JSON.stringify(data.guData));     Object.assign(guData,     data.guData); }
+    if (data.cobrarData) { localStorage.setItem(COBRAR_KEY,    JSON.stringify(data.cobrarData)); Object.assign(cobrarData, data.cobrarData); }
+    if (data.platData)   { localStorage.setItem(PLAT_KEY,      JSON.stringify(data.platData));   Object.assign(platData,   data.platData); }
+    restoreCommentsByCode();
+    restoreDiscardedByCode();
+    console.log(`✓ datos.json cargado (guardado: ${data.savedAt||'?'})`);
+  } catch(e) { console.warn('No se pudo cargar datos.json:', e.message); }
 }
 
 let productSnapshot = {};   // loaded from localStorage on init
@@ -1188,7 +1237,7 @@ fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e
 function processFile(file) {
   showLoading(true); setStatus(`Leyendo: ${file.name}`);
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const arrayBuf = e.target.result;
       const wb = XLSX.read(arrayBuf, { type: 'array', cellDates: true });
@@ -1206,7 +1255,8 @@ function processFile(file) {
       loadPersisted();
       restoreCommentsByCode();
       restoreDiscardedByCode();
-
+      // Also fetch shared team data from GitHub
+      await fetchDatosFromGitHub();
       // Save Excel to localStorage for auto-reload next visit
       saveExcelToStorage(arrayBuf, file.name);
 
@@ -2802,6 +2852,8 @@ async function fetchExcelFromGitHub() {
     loadPersisted();
     restoreCommentsByCode();
     restoreDiscardedByCode();
+    // Load shared team data (comments, states) from GitHub
+    await fetchDatosFromGitHub();
     saveExcelToStorage(arrayBuf, 'inventario.xlsx');
 
     showLoading(false);
