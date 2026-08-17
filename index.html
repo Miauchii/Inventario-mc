@@ -655,7 +655,7 @@ tr.tachado td:first-child { text-decoration: none; }
       <!-- Solo info, no se necesita config adicional -->
       <div style="padding:14px 16px;background:rgba(0,132,174,0.06);border:1px solid rgba(0,132,174,0.2);border-radius:8px;margin-bottom:18px;">
         <div style="font-size:0.72rem;color:var(--cyan);font-weight:600;margin-bottom:4px;">✓ Conectado a GitHub</div>
-        <div style="font-size:0.7rem;color:var(--text2);">Repositorio: <strong style="color:var(--text)">miauchii/Inventario-mc</strong></div>
+        <div style="font-size:0.7rem;color:var(--text2);">Repositorio: <strong style="color:var(--text)" id="ghRepoLabel">miauchii/Inventario-mc</strong></div>
         <div style="font-size:0.7rem;color:var(--text2);margin-top:2px;">Los cambios se sincronizan automáticamente al presionar 💾 Guardar</div>
       </div>
 
@@ -3454,39 +3454,22 @@ function saveGHConfig(cfg) {
 }
 
 function openGHModal() {
+  // El modal ya no pide usuario, repo ni token: el Worker de Cloudflare guarda
+  // las credenciales. Se muestra el repositorio configurado solo como dato.
   const cfg = getGHConfig();
-  document.getElementById('ghUser').value  = cfg.user  || GH_DEFAULT.user;
-  document.getElementById('ghRepo').value  = cfg.repo  || GH_DEFAULT.repo;
-  document.getElementById('ghToken').value = cfg.token || '';
-  document.getElementById('ghStatus').style.display = 'none';
+  const repoEl = document.getElementById('ghRepoLabel');
+  if (repoEl) repoEl.textContent = `${cfg.user}/${cfg.repo}`;
+  const st = document.getElementById('ghStatus');
+  if (st) st.style.display = 'none';
   document.getElementById('ghModal').style.display = 'flex';
 }
 function closeGHModal() {
   document.getElementById('ghModal').style.display = 'none';
 }
 
-async function saveGHConfigOnly() {
-  const user  = document.getElementById('ghUser').value.trim();
-  const repo  = document.getElementById('ghRepo').value.trim();
-  const token = document.getElementById('ghToken').value.trim();
-  if (!user || !repo) { showGHStatus('⚠ Completa usuario y repositorio.', 'amber'); return; }
-  saveGHConfig({ user, repo, token });
-  showGHStatus('✅ Configuración guardada. Descargando Excel…', 'green');
-  setTimeout(async () => {
-    closeGHModal();
-    document.getElementById('ghQuickConfig').style.display = 'none';
-    const ok = await fetchExcelFromGitHub();
-    if (!ok) {
-      document.getElementById('ghQuickConfig').style.display = 'flex';
-      setStatus('⚠ No se encontró inventario.xlsx en el repo. Carga el archivo manualmente o pide a la persona responsable que lo publique.');
-    }
-  }, 1000);
-}
-
 async function publishToGitHub() {
-  const user  = document.getElementById('ghUser').value.trim();
-  const repo  = document.getElementById('ghRepo').value.trim();
-  const token = document.getElementById('ghToken').value.trim();
+  // Usuario y repo salen de la configuración; el token vive en el Worker
+  const { user, repo } = getGHConfig();
   const statusEl = document.getElementById('ghStatus');
   const btn = document.getElementById('ghPublishBtn');
 
