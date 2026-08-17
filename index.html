@@ -4,339 +4,548 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestor de Inventario · MC Microcomputación</title>
+<meta name="theme-color" content="#005670">
+<meta name="description" content="Gestor de inventario rezagado — MC Microcomputación, S.A. de C.V.">
+<link rel="icon" href="https://microcomp.com.mx/_next/image?url=%2Fimg%2Flogo.png&w=64&q=75">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Fork compatible con SheetJS que sí escribe estilos de celda (semáforo en exportaciones) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Barlow:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700;800;900&display=swap');
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MC MICROCOMPUTACIÓN · Sistema de diseño
+   Basado en el Manual de Identidad Corporativa 2026
+   Primarios:   PANTONE 308C #005670 · PANTONE 7489C #71A850
+   Secundarios: PANTONE 312C #0084AE · PANTONE 312U #00ACD2 · Cool Gray #878787
+   Tipografía:  Maven Pro (Regular / Bold) — secundaria: Myriad Pro
+   ══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --bg:       #08090c;
-  --surface:  #10121a;
-  --surface2: #181c28;
-  --surface3: #1e2334;
-  --border:   #252c3f;
-  --border2:  #2e3650;
-  --cyan:     #00c8e0;
-  --cyan2:    #00a3c4;
-  --blue:     #0066cc;
-  --blue2:    #1a7fe0;
-  --accent:   #00c8e0;
-  --red:      #e84b3a;
-  --green:    #1bc47d;
-  --amber:    #f59e0b;
-  --purple:   #a78bfa;
-  --text:     #e8ecf4;
-  --text2:    #99a3bb;
-  --text3:    #525d7a;
+  /* — Paleta corporativa (valores exactos del manual) — */
+  --mc-blue:      #005670;   /* PANTONE 308C  · primario */
+  --mc-blue-u:    #246681;   /* PANTONE 308U */
+  --mc-green:     #71A850;   /* PANTONE 7489C · primario */
+  --mc-green-u:   #78AA65;   /* PANTONE 7737U */
+  --mc-cyan:      #0084AE;   /* PANTONE 312C  · secundario */
+  --mc-cyan-u:    #00ACD2;   /* PANTONE 312U  · secundario */
+  --mc-gray:      #878787;   /* COOL GRAY     · secundario */
+
+  /* — Superficies — */
+  --bg:       #eef2f5;
+  --surface:  #ffffff;
+  --surface2: #f4f7f9;
+  --surface3: #e6edf1;
+  --border:   #dde5ea;
+  --border2:  #c3d0d8;
+
+  /* — Roles semánticos (mapeados a la paleta MC) — */
+  --cyan:     #0084ae;   /* acento interactivo */
+  --cyan2:    #00acd2;
+  --blue:     #005670;   /* institucional */
+  --blue2:    #246681;
+  --accent:   #0084ae;
+  --green:    #4f8a33;   /* verde MC oscurecido para texto legible */
+  --green-br: #71a850;   /* verde MC pleno, para barras y rellenos */
+  --red:      #c0392b;
+  --amber:    #a96a00;
+  --purple:   #005670;   /* datos derivados → azul institucional */
+  --ml:       #a67c00;   /* Mercado Libre */
+
+  /* — Texto — */
+  --text:     #14313d;
+  --text2:    #55666f;
+  --text3:    #8b979e;
+
+  /* — Elevación — */
+  --sh-1: 0 1px 2px rgba(0,86,112,0.06);
+  --sh-2: 0 1px 2px rgba(0,86,112,0.05), 0 6px 18px rgba(0,86,112,0.07);
+  --sh-3: 0 20px 50px rgba(0,42,56,0.20);
+
+  /* — Tipografía — */
+  --font: 'Maven Pro', 'Myriad Pro', 'Segoe UI', system-ui, sans-serif;
+
+  /* — Radios — */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; min-height: 100vh; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 14px; min-height: 100vh;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+::selection { background: rgba(0,132,174,0.18); }
+
+/* Accesibilidad: anillo de foco visible y consistente */
+:focus-visible {
+  outline: 2px solid var(--mc-cyan);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbars claros de marca */
+* { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 6px; border: 3px solid var(--surface); }
+::-webkit-scrollbar-thumb:hover { background: var(--mc-gray); }
 
 /* ─── NAVBAR ─────────────────────────────────────────── */
 nav {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 40px; height: 64px;
-  background: linear-gradient(90deg, #0a0e1a 0%, #0d1220 100%);
+  gap: 16px; padding: 0 32px; min-height: 76px;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border), 0 4px 16px rgba(0,86,112,0.05);
   position: sticky; top: 0; z-index: 50;
-  box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  flex-wrap: wrap;
 }
-.nav-logo { display: flex; align-items: center; gap: 12px; }
-.nav-logo img { height: 32px; object-fit: contain; }
-.nav-divider { width: 1px; height: 28px; background: var(--border2); }
-.nav-title { font-family: 'Barlow', sans-serif; font-weight: 700; font-size: 1rem; color: var(--text2); letter-spacing: 0.3px; }
+/* Área de seguridad del logotipo (manual 4.1.1): margen libre alrededor */
+.nav-logo { display: flex; align-items: center; gap: 16px; padding: 12px 0; min-width: 0; }
+.nav-logo img { height: 48px; width: auto; object-fit: contain; display: block; padding-right: 14px; }
+.nav-divider { width: 1px; height: 30px; background: var(--border2); flex-shrink: 0; }
+.nav-title {
+  font-family: var(--font); font-weight: 700; font-size: 0.95rem;
+  color: var(--mc-blue); letter-spacing: 0.2px; line-height: 1.2;
+}
+.nav-title small {
+  display: block; font-weight: 500; font-size: 0.68rem;
+  color: var(--text3); letter-spacing: 0.6px; text-transform: uppercase;
+}
+.nav-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .nav-badge {
-  font-size: 0.6rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
-  background: linear-gradient(135deg, var(--cyan), var(--blue2));
-  color: #000; padding: 3px 9px; border-radius: 20px;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+  background: rgba(0,86,112,0.08); color: var(--mc-blue);
+  border: 1px solid rgba(0,86,112,0.18);
+  padding: 4px 10px; border-radius: 20px;
+}
+#navFileName {
+  font-size: 0.7rem; color: var(--text3); max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* ─── MAIN ───────────────────────────────────────────── */
-main { max-width: 1600px; margin: 0 auto; padding: 32px 40px; }
+main { max-width: 1680px; margin: 0 auto; padding: 28px 32px 64px; }
 
 /* ─── UPLOAD ZONE ────────────────────────────────────── */
 #uploadZone {
-  border: 2px dashed var(--border2); border-radius: 12px;
+  border: 2px dashed var(--border2); border-radius: var(--r-lg);
   padding: 56px 40px; text-align: center; cursor: pointer;
-  transition: all 0.25s; background: var(--surface);
-  position: relative; overflow: hidden;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+  background: var(--surface); position: relative; overflow: hidden;
 }
 #uploadZone::before {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse at 50% 120%, rgba(0,200,224,0.07) 0%, transparent 65%);
+  background: radial-gradient(ellipse at 50% 130%, rgba(0,132,174,0.07) 0%, transparent 62%);
 }
-#uploadZone:hover, #uploadZone.drag-over {
-  border-color: var(--cyan); background: rgba(0,200,224,0.04);
-  box-shadow: 0 0 30px rgba(0,200,224,0.08);
-}
-.upload-icon { font-size: 2.8rem; display: block; margin-bottom: 14px; }
-.upload-title { font-family: 'Barlow', sans-serif; font-size: 1.35rem; font-weight: 700; margin-bottom: 8px; }
-.upload-sub { color: var(--text2); font-size: 0.78rem; }
+#uploadZone:hover { border-color: var(--mc-cyan); background: rgba(0,132,174,0.03); box-shadow: var(--sh-2); }
+#uploadZone.drag-over { border-color: var(--mc-green); background: rgba(113,168,80,0.07); box-shadow: var(--sh-2); }
+.upload-icon { font-size: 2.6rem; display: block; margin-bottom: 14px; }
+.upload-title { font-family: var(--font); font-size: 1.3rem; font-weight: 700; color: var(--mc-blue); }
+.upload-sub { color: var(--text2); font-size: 0.8rem; }
 #fileInput { display: none; }
+
+.gh-quick {
+  margin-top: 14px; padding: 14px 18px; background: var(--surface);
+  border: 1px solid var(--border); border-left: 3px solid var(--mc-cyan);
+  border-radius: var(--r-md); align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; box-shadow: var(--sh-1);
+}
 
 /* ─── STATUS BAR ─────────────────────────────────────── */
 #statusBar {
   display: none; align-items: center; gap: 10px;
-  padding: 10px 16px; background: var(--surface2);
-  border: 1px solid var(--border); border-radius: 8px;
-  margin-top: 14px; font-size: 0.76rem; color: var(--text2);
+  padding: 11px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  margin-top: 14px; font-size: 0.78rem; color: var(--text2);
+  box-shadow: var(--sh-1);
 }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); flex-shrink: 0; animation: pulse 1.5s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mc-cyan); flex-shrink: 0; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
 
 /* ─── APP SECTION ────────────────────────────────────── */
-#appSection { display: none; margin-top: 28px; }
+#appSection { display: none; margin-top: 24px; }
 
 /* ─── STATS STRIP ────────────────────────────────────── */
 .stats-strip {
-  display: grid; grid-template-columns: repeat(8, 1fr);
-  gap: 10px; margin-bottom: 24px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 12px; margin-bottom: 22px;
 }
 .stat-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 16px 16px 14px;
-  position: relative; overflow: hidden;
+  border-radius: var(--r-md); padding: 15px 16px 14px;
+  position: relative; overflow: hidden; box-shadow: var(--sh-1);
+  transition: box-shadow .18s, transform .18s;
 }
+.stat-card:hover { box-shadow: var(--sh-2); transform: translateY(-1px); }
 .stat-card::after {
-  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
-  background: var(--card-accent, var(--border));
+  content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 3px;
+  background: var(--card-accent, var(--border2));
 }
-.stat-label { font-size: 0.58rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; font-weight: 600; }
-.stat-value { font-family: 'Barlow', sans-serif; font-size: 1.5rem; font-weight: 800; line-height: 1; color: var(--text); }
+.stat-label {
+  font-size: 0.6rem; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 1.1px; margin-bottom: 8px; font-weight: 700; line-height: 1.35;
+}
+.stat-value {
+  font-family: var(--font); font-size: 1.55rem; font-weight: 800;
+  line-height: 1; color: var(--text); font-variant-numeric: tabular-nums;
+}
 .stat-value.cyan   { color: var(--cyan); }
 .stat-value.red    { color: var(--red); }
 .stat-value.green  { color: var(--green); }
 .stat-value.amber  { color: var(--amber); }
-.stat-value.blue   { color: var(--blue2); font-size: 1.05rem; }
-.stat-value.purple { color: var(--purple); font-size: 1.05rem; }
-.stat-card.c-cyan  { --card-accent: var(--cyan); }
+.stat-value.blue   { color: var(--blue2); font-size: 1.1rem; }
+.stat-value.purple { color: var(--purple); font-size: 1.1rem; }
+.stat-value.orange { color: var(--amber); font-size: 1.05rem; }
+.stat-card.c-cyan  { --card-accent: var(--mc-cyan); }
 .stat-card.c-red   { --card-accent: var(--red); }
-.stat-card.c-green { --card-accent: var(--green); }
+.stat-card.c-green { --card-accent: var(--mc-green); }
 .stat-card.c-amber { --card-accent: var(--amber); }
-.stat-card.c-blue  { --card-accent: var(--blue2); }
-.stat-card.c-purple{ --card-accent: var(--purple); }
-.stat-card.c-orange{ --card-accent: #fb923c; }
-.stat-value.orange { color: #fb923c; font-size: 1rem; }
+.stat-card.c-blue  { --card-accent: var(--mc-blue-u); }
+.stat-card.c-purple{ --card-accent: var(--mc-blue); }
+.stat-card.c-orange{ --card-accent: var(--mc-gray); }
 
 /* ─── TABS ───────────────────────────────────────────── */
 .tabs-wrap {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px 10px 0 0; border-bottom: none;
+  border-radius: var(--r-md) var(--r-md) 0 0; border-bottom: none;
   display: flex; padding: 0 8px; gap: 2px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
 }
+.tabs-wrap::-webkit-scrollbar { display: none; }
 .tab-btn {
-  padding: 14px 20px; background: none; border: none;
-  color: var(--text2); font-family: 'Inter', sans-serif;
-  font-size: 0.76rem; font-weight: 500; cursor: pointer;
+  padding: 15px 18px; background: none; border: none;
+  color: var(--text2); font-family: var(--font);
+  font-size: 0.79rem; font-weight: 600; cursor: pointer;
   border-bottom: 2px solid transparent; margin-bottom: -1px;
-  transition: all 0.18s; letter-spacing: 0.2px; white-space: nowrap;
+  transition: color .16s, border-color .16s, background .16s;
+  letter-spacing: 0.1px; white-space: nowrap; border-radius: var(--r-sm) var(--r-sm) 0 0;
 }
-.tab-btn:hover { color: var(--text); }
-.tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
-.tab-panel { display: none; padding: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 10px 10px; }
+.tab-btn:hover { color: var(--mc-blue); background: rgba(0,132,174,0.05); }
+.tab-btn.active { color: var(--mc-cyan); border-bottom-color: var(--mc-cyan); }
+.tab-panel {
+  display: none; padding: 22px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 0 0 var(--r-md) var(--r-md);
+  box-shadow: var(--sh-1);
+}
 .tab-panel.active { display: block; }
 
 /* ─── TAB DROPDOWN ───────────────────────────────────── */
 .tab-dropdown { position: relative; display: inline-flex; align-items: stretch; }
 .tab-dropdown-trigger { border-bottom: 2px solid transparent; }
-.tab-dropdown-trigger.dropdown-active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.tab-dropdown-trigger.dropdown-active { color: var(--mc-cyan); border-bottom-color: var(--mc-cyan); }
 .tab-dropdown-menu {
-  display: none; position: absolute; top: 100%; left: 0; z-index: 50;
-  background: var(--surface2); border: 1px solid var(--border2);
-  border-radius: 0 0 8px 8px; min-width: 180px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4); overflow: hidden;
+  display: none; position: absolute; top: 100%; left: 0; z-index: 60;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 0 var(--r-sm) var(--r-sm) var(--r-sm); min-width: 200px;
+  box-shadow: var(--sh-3); overflow: hidden; padding: 4px;
 }
 .tab-dropdown-menu.open { display: block; }
 .tab-dropdown-item {
-  display: block; width: 100%; padding: 10px 16px;
+  display: block; width: 100%; padding: 10px 14px;
   background: none; border: none; color: var(--text2);
-  font-family: 'Inter', sans-serif; font-size: 0.76rem; font-weight: 500;
-  text-align: left; cursor: pointer; transition: background 0.15s; white-space: nowrap;
+  font-family: var(--font); font-size: 0.79rem; font-weight: 500;
+  text-align: left; cursor: pointer; transition: background .14s, color .14s;
+  white-space: nowrap; border-radius: var(--r-sm);
 }
-.tab-dropdown-item:hover { background: rgba(0,200,224,0.08); color: var(--cyan); }
-.tab-dropdown-item.active { color: var(--cyan); background: rgba(0,200,224,0.05); }
+.tab-dropdown-item:hover { background: rgba(0,132,174,0.08); color: var(--mc-blue); }
+.tab-dropdown-item.active { color: var(--mc-cyan); background: rgba(0,132,174,0.06); font-weight: 600; }
 
 /* ─── TOOLBAR ────────────────────────────────────────── */
-.toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.tlabel { font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; flex-shrink: 0; }
-select, input[type="text"] {
-  background: var(--surface2); border: 1px solid var(--border2);
-  color: var(--text); font-family: 'Inter', sans-serif;
-  font-size: 0.74rem; padding: 7px 11px; border-radius: 6px;
-  outline: none; transition: border-color 0.18s;
+.field { display: inline-flex; align-items: center; gap: 7px; }
+.toolbar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+  flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--border);
 }
-select:focus, input[type="text"]:focus { border-color: var(--cyan); }
-select option { background: #181c28; }
+.tlabel {
+  font-size: 0.65rem; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 1px; font-weight: 700; flex-shrink: 0;
+}
+/* Campos de las barras de filtros. Se excluye .comment-input: son los campos
+   editables dentro de las tablas y necesitan ser compactos. */
+select,
+input[type="text"]:not(.comment-input),
+input[type="password"]:not(.comment-input),
+input[type="number"]:not(.comment-input) {
+  background: var(--surface); border: 1px solid var(--border2);
+  color: var(--text); font-family: var(--font);
+  font-size: 0.78rem; padding: 8px 11px; border-radius: var(--r-sm);
+  outline: none; transition: border-color .16s, box-shadow .16s; min-height: 34px;
+}
+select { cursor: pointer; padding-right: 26px; }
+select:hover, input[type="text"]:not(.comment-input):hover { border-color: var(--mc-gray); }
+select:focus,
+input[type="text"]:not(.comment-input):focus,
+input[type="password"]:focus,
+input[type="number"]:not(.comment-input):focus {
+  border-color: var(--mc-cyan); box-shadow: 0 0 0 3px rgba(0,132,174,0.14);
+}
+input::placeholder { color: var(--text3); }
+select option { background: var(--surface); color: var(--text); }
 
 .btn {
-  padding: 7px 14px; border-radius: 6px; font-family: 'Inter', sans-serif;
-  font-size: 0.73rem; font-weight: 500; cursor: pointer; border: none;
-  transition: all 0.15s; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 14px; border-radius: var(--r-sm); font-family: var(--font);
+  font-size: 0.76rem; font-weight: 600; cursor: pointer; border: 1px solid transparent;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+  white-space: nowrap; min-height: 34px; line-height: 1;
 }
-.btn-primary { background: linear-gradient(135deg, var(--cyan), var(--blue2)); color: #000; }
-.btn-primary:hover { opacity: 0.88; }
-.btn-ghost { background: none; border: 1px solid var(--border2); color: var(--text2); }
-.btn-ghost:hover { border-color: var(--text2); color: var(--text); }
-.btn-danger { background: none; border: 1px solid var(--red); color: var(--red); }
-.btn-danger:hover { background: rgba(232,75,58,0.1); }
-.btn-amber { background: none; border: 1px solid var(--amber); color: var(--amber); }
-.btn-amber:hover { background: rgba(245,158,11,0.1); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--mc-blue); color: #fff; box-shadow: var(--sh-1); }
+.btn-primary:hover { background: #00465c; box-shadow: var(--sh-2); }
+.btn-ghost { background: var(--surface); border-color: var(--border2); color: var(--text2); }
+.btn-ghost:hover { border-color: var(--mc-cyan); color: var(--mc-blue); background: rgba(0,132,174,0.05); }
+.btn-danger { background: var(--surface); border-color: rgba(192,57,43,0.45); color: var(--red); }
+.btn-danger:hover { background: rgba(192,57,43,0.08); border-color: var(--red); }
+.btn-amber { background: var(--surface); border-color: rgba(169,106,0,0.45); color: var(--amber); }
+.btn-amber:hover { background: rgba(169,106,0,0.08); border-color: var(--amber); }
+.btn-accent { background: var(--surface); border-color: var(--mc-cyan); color: var(--mc-cyan); }
+.btn-accent:hover { background: rgba(0,132,174,0.08); }
+.btn-success { background: var(--surface); border-color: rgba(113,168,80,0.55); color: var(--green); }
+.btn-success:hover { background: rgba(113,168,80,0.10); border-color: var(--mc-green); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ─── TABLES ─────────────────────────────────────────── */
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-.tscroll { height: 520px; overflow-y: auto; }
-.tscroll::-webkit-scrollbar { width: 5px; }
-.tscroll::-webkit-scrollbar-track { background: var(--surface); }
-.tscroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.tscroll { height: 540px; overflow-y: auto; }
 .vs-spacer td { pointer-events: none; background: transparent !important; }
-table { width: 100%; border-collapse: collapse; font-size: 0.73rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 thead th {
-  background: var(--surface2); padding: 9px 11px;
-  text-align: left; color: var(--text3);
-  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
-  border-bottom: 1px solid var(--border); white-space: nowrap;
-  position: sticky; top: 0; z-index: 2;
+  background: var(--surface2); padding: 11px 12px;
+  text-align: left; color: var(--text2);
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.9px; font-weight: 700;
+  border-bottom: 1px solid var(--border2); white-space: nowrap;
+  /* z-index alto: las celdas fijas de la izquierda (z-index 2–3) nunca deben
+     pintarse encima del encabezado al hacer scroll */
+  position: sticky; top: 0; z-index: 4;
+  background-clip: padding-box;
 }
 thead th.r { text-align: right; }
-tbody tr { border-bottom: 1px solid rgba(37,44,63,0.6); transition: background 0.1s; }
-tbody tr:hover { background: rgba(0,200,224,0.03); }
-tbody td { padding: 8px 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+tbody tr:hover { background: rgba(0,132,174,0.07); }
+tbody td { padding: 8px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; color: var(--text); }
 td.r { text-align: right; font-variant-numeric: tabular-nums; }
-tfoot td { font-weight: 600; color: var(--cyan); border-top: 1px solid var(--border2); background: rgba(0,200,224,0.04) !important; padding: 9px 11px; font-size: 0.73rem; }
+tfoot td {
+  font-weight: 700; color: var(--mc-blue); border-top: 2px solid var(--border2);
+  background: var(--surface2) !important; padding: 11px 12px; font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── EQUIPOS COMERCIALES ────────────────────────────── */
+.equipo-chip {
+  display: inline-flex; align-items: center; padding: 3px 9px;
+  border: 1px solid transparent; border-radius: 20px;
+  font-size: 0.63rem; font-weight: 700; letter-spacing: 0.4px; white-space: nowrap;
+}
+.team-strip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.team-card {
+  position: relative; overflow: hidden; text-align: left;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 14px 16px 13px;
+  cursor: pointer; font-family: var(--font); box-shadow: var(--sh-1);
+  transition: box-shadow .18s, transform .18s, border-color .18s;
+}
+.team-card:hover { box-shadow: var(--sh-2); transform: translateY(-2px); border-color: var(--border2); }
+.team-card::after { content:''; position:absolute; top:0; left:0; bottom:0; width:4px; background: var(--team-color, var(--border2)); }
+.team-card-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:9px; }
+.team-card-name { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.4px; color: var(--team-color); }
+.team-card-pct { font-size: 0.6rem; font-weight: 700; color: var(--text2); background: var(--surface2); border:1px solid var(--border); padding: 2px 7px; border-radius: 20px; }
+.team-card-val { font-size: 1.15rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height:1.1; }
+.team-card-sub { font-size: 0.64rem; color: var(--text2); margin-top: 4px; }
+.team-card-sub b { color: var(--red); font-weight: 700; }
+.team-card-go { font-size: 0.6rem; font-weight: 700; color: var(--team-color); margin-top: 9px; opacity: .75; }
+.team-strip-head {
+  display:flex; align-items:baseline; gap:10px; margin: 4px 0 10px;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 1.1px;
+  text-transform: uppercase; color: var(--text3);
+}
+.team-strip-head span { font-weight:500; letter-spacing:0.2px; text-transform:none; font-size:0.66rem; color:var(--text3); }
 
 /* ─── CHIPS ──────────────────────────────────────────── */
-.chip { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px; font-size: 0.6rem; font-weight: 600; letter-spacing: 0.4px; }
-.chip-red   { background: rgba(232,75,58,0.15);  color: var(--red);   border: 1px solid rgba(232,75,58,0.3); }
-.chip-ok    { background: rgba(27,196,125,0.12); color: var(--green); border: 1px solid rgba(27,196,125,0.3); }
-.chip-desc  { background: rgba(232,75,58,0.08);  color: #c87060;      border: 1px solid rgba(232,75,58,0.2); }
-.chip-amber { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+.chip {
+  display: inline-flex; align-items: center; padding: 3px 8px;
+  border-radius: 4px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.3px;
+}
+.chip-red   { background: rgba(192,57,43,0.10);  color: var(--red);   border: 1px solid rgba(192,57,43,0.28); }
+.chip-ok    { background: rgba(113,168,80,0.14); color: var(--green); border: 1px solid rgba(113,168,80,0.40); }
+.chip-desc  { background: rgba(135,135,135,0.12);color: #6d5049;      border: 1px solid rgba(135,135,135,0.30); }
+.chip-amber { background: rgba(169,106,0,0.10);  color: var(--amber); border: 1px solid rgba(169,106,0,0.30); }
 
-.meses-tag { font-weight: 600; }
+.meses-tag { font-weight: 700; font-variant-numeric: tabular-nums; }
 .meses-tag.over  { color: var(--red); }
 .meses-tag.under { color: var(--green); }
 
-tr.tachado { opacity: 0.35; }
-tr.tachado td { text-decoration: line-through; color: #444d66; }
+tr.tachado { opacity: 0.55; }
+tr.tachado td { text-decoration: line-through; color: var(--text3); }
 tr.tachado td:first-child { text-decoration: none; }
-.row-check { width: 15px; height: 15px; accent-color: var(--red); cursor: pointer; }
+.row-check { width: 16px; height: 16px; accent-color: var(--red); cursor: pointer; }
 
-.prog { width: 42px; height: 3px; background: var(--border2); border-radius: 2px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 5px; }
-.prog-fill { height: 100%; border-radius: 2px; }
+.prog { width: 46px; height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+.prog-fill { height: 100%; border-radius: 2px; display: block; }
 
 /* ─── VENDEDOR CELL ──────────────────────────────────── */
-.vend-cell { color: var(--cyan); font-size: 0.68rem; font-weight: 500; }
+.vend-cell { color: var(--cyan); font-size: 0.72rem; font-weight: 600; }
 
 /* ─── COMMENT ────────────────────────────────────────── */
 .comment-cell { min-width: 150px; max-width: 200px; }
 .comment-input {
   width: 100%; background: transparent; border: none;
-  border-bottom: 1px dashed transparent; color: var(--text3);
-  font-family: 'Inter', sans-serif; font-size: 0.68rem;
-  padding: 2px 4px; outline: none; transition: all 0.15s;
+  border-bottom: 1px dashed var(--border2); color: var(--text2);
+  font-family: var(--font); font-size: 0.73rem;
+  padding: 3px 4px; outline: none; transition: all .15s; border-radius: 3px 3px 0 0;
+  /* no hereda el min-height de los campos de la barra de filtros: dentro de la
+     tabla eso hacía las filas 40% más altas */
+  min-height: 22px;
 }
-.comment-input:hover { border-bottom-color: var(--border2); color: var(--text); }
-.comment-input:focus { border-bottom-color: var(--cyan); color: var(--text); background: rgba(0,200,224,0.04); }
-.comment-input::placeholder { color: #333d55; font-style: italic; }
-.comment-input.has-comment { color: var(--purple); border-bottom-color: rgba(167,139,250,0.35); }
+.comment-input:hover { border-bottom-color: var(--mc-gray); color: var(--text); }
+.comment-input:focus { border-bottom-color: var(--mc-cyan); color: var(--text); background: rgba(0,132,174,0.06); }
+.comment-input::placeholder { color: var(--text3); font-style: italic; }
+.comment-input.has-comment { color: var(--mc-blue); font-weight: 600; border-bottom-color: rgba(0,86,112,0.35); }
 
 /* ─── HINT BAR ───────────────────────────────────────── */
-.hint-bar { font-size: 0.7rem; color: var(--text2); margin-bottom: 14px; padding: 9px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; line-height: 1.5; }
-.hint-bar strong { color: var(--text); }
+.hint-bar {
+  font-size: 0.76rem; color: var(--text2); margin-bottom: 16px;
+  padding: 11px 14px 11px 16px; background: rgba(0,132,174,0.05);
+  border: 1px solid rgba(0,132,174,0.18); border-left: 3px solid var(--mc-cyan);
+  border-radius: var(--r-sm); line-height: 1.6;
+}
+.hint-bar strong { color: var(--mc-blue); font-weight: 700; }
+
+/* ─── SECTION HEADING ────────────────────────────────── */
+.section-head {
+  font-family: var(--font); font-weight: 800; font-size: 0.8rem;
+  color: var(--text2); text-transform: uppercase; letter-spacing: 1.3px;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
 
 /* ─── DOWNLOAD AREA ──────────────────────────────────── */
-.dl-area { margin-top: 20px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-.dl-info { font-size: 0.72rem; color: var(--text2); }
-.dl-info strong { color: var(--text); }
+.dl-area {
+  margin-top: 20px; padding: 16px 18px; border: 1px solid var(--border);
+  border-radius: var(--r-md); background: var(--surface2);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.dl-info { font-size: 0.78rem; color: var(--text2); }
+.dl-info strong { color: var(--mc-blue); font-weight: 700; }
 
 /* ─── EMPTY STATE ────────────────────────────────────── */
-.empty { text-align: center; padding: 50px 20px; color: var(--text3); }
-.empty-icon { font-size: 2.2rem; margin-bottom: 10px; }
+.empty { text-align: center; padding: 54px 20px; color: var(--text3); font-size: 0.85rem; }
+.empty-icon { font-size: 2.2rem; margin-bottom: 10px; opacity: .7; }
 
 /* ─── YEAR ANALYSIS ──────────────────────────────────── */
-.year-layout { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
-.chart-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 22px; }
-.chart-title { font-family: 'Barlow', sans-serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
-.chart-sub { font-size: 0.65rem; color: var(--text2); margin-bottom: 18px; }
+.year-layout { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 18px; align-items: start; }
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 22px; box-shadow: var(--sh-1); }
+.chart-title { font-family: var(--font); font-size: 1rem; font-weight: 800; color: var(--mc-blue); margin-bottom: 4px; }
+.chart-sub { font-size: 0.7rem; color: var(--text2); margin-bottom: 18px; }
 .bar-chart { display: flex; flex-direction: column; gap: 9px; }
-.bar-row { display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 5px; padding: 3px 4px; transition: background 0.15s; }
-.bar-row:hover { background: rgba(0,200,224,0.04); }
-.bar-row.selected { background: rgba(0,200,224,0.08); outline: 1px solid rgba(0,200,224,0.2); }
-.bar-year { font-size: 0.68rem; color: var(--text2); width: 34px; flex-shrink: 0; text-align: right; }
-.bar-track { flex: 1; height: 24px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 4px; transition: width 0.55s cubic-bezier(0.4,0,0.2,1); display: flex; align-items: center; padding-left: 8px; min-width: 4px; }
-.bar-fill-label { font-size: 0.6rem; font-weight: 600; color: #000; white-space: nowrap; overflow: hidden; }
-.bar-value { font-size: 0.65rem; color: var(--text2); width: 105px; flex-shrink: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.bar-row { display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: var(--r-sm); padding: 3px 4px; transition: background .15s; }
+.bar-row:hover { background: rgba(0,132,174,0.06); }
+.bar-row.selected { background: rgba(0,132,174,0.10); outline: 1px solid rgba(0,132,174,0.35); }
+.bar-year { font-size: 0.74rem; font-weight: 600; color: var(--text2); width: 38px; flex-shrink: 0; text-align: right; }
+.bar-track { flex: 1; height: 26px; background: var(--surface3); border-radius: var(--r-sm); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: var(--r-sm); transition: width .55s cubic-bezier(.4,0,.2,1); display: flex; align-items: center; padding-left: 9px; min-width: 4px; }
+.bar-fill-label { font-size: 0.63rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; }
+.bar-value { font-size: 0.72rem; color: var(--text2); width: 112px; flex-shrink: 0; text-align: right; font-variant-numeric: tabular-nums; }
 
-.ytable-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; max-height: 450px; }
+.ytable-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; display: flex; flex-direction: column; max-height: 470px; box-shadow: var(--sh-1); }
 .ytable-scroll { overflow-y: auto; flex: 1; }
-.ytable-scroll::-webkit-scrollbar { width: 4px; }
-.ytable-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 .ytable-card table { width: 100%; border-collapse: collapse; }
-.ytable-card thead th { font-size: 0.58rem; padding: 9px 12px; position: sticky; top: 0; z-index: 2; background: var(--surface3); }
-.ytable-card tbody td { padding: 8px 12px; font-size: 0.72rem; cursor: pointer; }
-.ytable-card tbody tr { transition: background 0.12s; cursor: pointer; }
-.ytable-card tbody tr:hover { background: rgba(0,200,224,0.05); }
-.ytable-card tbody tr.sel-yr { background: rgba(0,200,224,0.09) !important; }
-.ytable-card tfoot td { padding: 8px 12px; font-size: 0.72rem; }
-.yr-total-row td { font-weight: 700; color: var(--cyan) !important; background: rgba(0,200,224,0.06) !important; border-top: 1px solid var(--border2) !important; }
+.ytable-card thead th { font-size: 0.6rem; padding: 10px 12px; position: sticky; top: 0; z-index: 2; background: var(--surface2); }
+.ytable-card tbody td { padding: 9px 12px; font-size: 0.76rem; cursor: pointer; }
+.ytable-card tbody tr { transition: background .12s; cursor: pointer; }
+.ytable-card tbody tr:hover { background: rgba(0,132,174,0.07); }
+.ytable-card tbody tr.sel-yr { background: rgba(0,132,174,0.12) !important; }
+.ytable-card tfoot td { padding: 10px 12px; font-size: 0.76rem; }
+.yr-total-row td { font-weight: 800; color: var(--mc-blue) !important; background: var(--surface2) !important; border-top: 2px solid var(--border2) !important; }
 
 /* ─── DRILL PANEL ────────────────────────────────────── */
-#drillPanel { display: none; margin-top: 18px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+#drillPanel { display: none; margin-top: 18px; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); box-shadow: var(--sh-1); }
 #drillPanel.open { display: block; }
-.drill-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; background: var(--surface2); border-bottom: 1px solid var(--border); }
-.drill-title { font-family: 'Barlow', sans-serif; font-size: 0.9rem; font-weight: 700; }
-.drill-title span { color: var(--cyan); }
-.drill-close { background: none; border: none; color: var(--text2); font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
-.drill-close:hover { color: var(--text); }
-.drill-scroll { max-height: 380px; overflow-y: auto; }
-.drill-scroll::-webkit-scrollbar { width: 4px; }
-.drill-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.drill-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 18px; background: var(--surface2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.drill-title { font-family: var(--font); font-size: 0.92rem; font-weight: 800; color: var(--mc-blue); }
+.drill-title span { color: var(--mc-cyan); }
+.drill-close { background: none; border: none; color: var(--text2); font-size: 1.05rem; cursor: pointer; padding: 4px 8px; border-radius: var(--r-sm); line-height: 1; }
+.drill-close:hover { color: var(--red); background: rgba(192,57,43,0.08); }
+.drill-scroll { max-height: 400px; overflow-y: auto; }
 
 /* ─── EMPRESA CARDS ──────────────────────────────────── */
-.emp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 14px; margin-bottom: 24px; }
+.emp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 14px; margin-bottom: 22px; }
 .emp-card {
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 20px; position: relative; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 20px; position: relative; overflow: hidden;
+  cursor: pointer; box-shadow: var(--sh-1); transition: box-shadow .18s, transform .18s, border-color .18s;
 }
-.emp-card-bar { position: absolute; top: 0; left: 0; height: 3px; border-radius: 10px 0 0 0; transition: width 0.5s ease; }
-.emp-card-name { font-family: 'Barlow', sans-serif; font-weight: 800; font-size: 1.5rem; }
-.emp-card-pct { font-size: 0.62rem; color: var(--text2); background: var(--surface3); padding: 2px 7px; border-radius: 3px; }
-.emp-card-val { font-family: 'Barlow', sans-serif; font-size: 1.4rem; font-weight: 800; margin: 10px 0 3px; }
-.emp-card-sub { font-size: 0.65rem; color: var(--text2); margin-bottom: 12px; }
-.emp-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.emp-mini { background: var(--surface3); border-radius: 5px; padding: 8px 10px; }
-.emp-mini-label { font-size: 0.55rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; font-weight: 600; }
-.emp-mini-val { font-family: 'Barlow', sans-serif; font-weight: 700; font-size: 1rem; }
+.emp-card:hover { box-shadow: var(--sh-2); transform: translateY(-2px); border-color: var(--border2); }
+.emp-card-bar { position: absolute; top: 0; left: 0; height: 4px; border-radius: var(--r-md) 0 0 0; transition: width .5s ease; }
+.emp-card-name { font-family: var(--font); font-weight: 800; font-size: 1.45rem; }
+.emp-card-pct { font-size: 0.64rem; font-weight: 600; color: var(--text2); background: var(--surface3); padding: 3px 8px; border-radius: 4px; }
+.emp-card-val { font-family: var(--font); font-size: 1.35rem; font-weight: 800; margin: 10px 0 3px; color: var(--text); font-variant-numeric: tabular-nums; }
+.emp-card-sub { font-size: 0.7rem; color: var(--text2); margin-bottom: 12px; }
+.emp-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.emp-mini { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 9px 10px; }
+.emp-mini-label { font-size: 0.56rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 3px; font-weight: 700; }
+.emp-mini-val { font-family: var(--font); font-weight: 800; font-size: 1rem; font-variant-numeric: tabular-nums; }
 
-/* ─── FX PURPLE COLS ─────────────────────────────────── */
-.col-purple { background: rgba(167,139,250,0.04); }
+/* ─── COLUMNAS DERIVADAS ─────────────────────────────── */
+.col-purple { background: rgba(0,86,112,0.035); }
 .col-purple-text { color: var(--purple); }
 
-/* ─── COPY MODAL ─────────────────────────────────────── */
-#copyModal { display:none; position:fixed; inset:0; background:rgba(8,9,12,0.88); z-index:300; align-items:center; justify-content:center; padding:20px; }
+/* ─── MODALES ────────────────────────────────────────── */
+#copyModal { display:none; position:fixed; inset:0; background:rgba(10,40,52,0.55); backdrop-filter:blur(3px); z-index:300; align-items:center; justify-content:center; padding:20px; }
 #copyModal.show { display:flex; }
-.modal-box { background:var(--surface); border:1px solid var(--border2); border-radius:12px; width:100%; max-width:640px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.6); }
+.modal-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); width:100%; max-width:640px; overflow:hidden; box-shadow:var(--sh-3); }
 .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--border); background:var(--surface2); }
-.modal-title { font-family:'Barlow',sans-serif; font-weight:700; font-size:1rem; }
-.modal-close { background:none; border:none; color:var(--text2); font-size:1.2rem; cursor:pointer; padding:2px 6px; }
-.modal-close:hover { color:var(--text); }
+.modal-title { font-family:var(--font); font-weight:800; font-size:1rem; color:var(--mc-blue); }
+.modal-close { background:none; border:none; color:var(--text2); font-size:1.15rem; cursor:pointer; padding:4px 8px; border-radius:var(--r-sm); line-height:1; }
+.modal-close:hover { color:var(--red); background:rgba(192,57,43,0.08); }
 .modal-body { padding:22px; }
-.modal-info { font-size:0.78rem; color:var(--text2); margin-bottom:16px; line-height:1.6; }
-.modal-info strong { color:var(--cyan); }
-.modal-steps { display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
-.modal-step { display:flex; align-items:flex-start; gap:10px; font-size:0.75rem; color:var(--text2); }
-.step-num { width:20px; height:20px; border-radius:50%; background:linear-gradient(135deg,var(--cyan),var(--blue2)); color:#000; font-weight:700; font-size:0.65rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
-.modal-footer { display:flex; gap:10px; justify-content:flex-end; padding:16px 22px; border-top:1px solid var(--border); background:var(--surface2); }
-.copy-status { font-size:0.72rem; color:var(--green); display:none; align-items:center; gap:6px; margin-right:auto; }
+.modal-info { font-size:0.82rem; color:var(--text2); margin-bottom:16px; line-height:1.6; }
+.modal-info strong { color:var(--mc-blue); }
+.modal-steps { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+.modal-step { display:flex; align-items:flex-start; gap:10px; font-size:0.79rem; color:var(--text2); }
+.step-num { width:22px; height:22px; border-radius:50%; background:var(--mc-blue); color:#fff; font-weight:700; font-size:0.68rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.modal-footer { display:flex; gap:10px; justify-content:flex-end; padding:16px 22px; border-top:1px solid var(--border); background:var(--surface2); flex-wrap:wrap; }
+.copy-status { font-size:0.76rem; color:var(--green); font-weight:600; display:none; align-items:center; gap:6px; margin-right:auto; }
 .copy-status.show { display:flex; }
 
 /* ─── LOADING ────────────────────────────────────────── */
-#loadingOverlay { display: none; position: fixed; inset: 0; background: rgba(8,9,12,0.88); z-index: 200; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+#loadingOverlay { display:none; position:fixed; inset:0; background:rgba(238,242,245,0.88); backdrop-filter:blur(2px); z-index:200; align-items:center; justify-content:center; flex-direction:column; gap:16px; }
 #loadingOverlay.show { display: flex; }
-.spinner { width: 34px; height: 34px; border: 3px solid var(--border2); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.65s linear infinite; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--surface3); border-top-color: var(--mc-cyan); border-radius: 50%; animation: spin .65s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.loading-text { font-size: 0.76rem; color: var(--text2); }
+.loading-text { font-size: 0.8rem; color: var(--text2); font-weight: 600; }
+
+/* ─── TOGGLE ─────────────────────────────────────────── */
+.filter-bar {
+  display:flex; align-items:center; gap:12px; margin-bottom:12px;
+  padding:10px 16px; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-md); flex-wrap:wrap; box-shadow:var(--sh-1);
+}
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .year-layout { grid-template-columns: 1fr; }
+  .ytable-card { max-height: none; }
+}
+@media (max-width: 860px) {
+  nav { padding: 0 18px; }
+  main { padding: 20px 18px 48px; }
+  .tab-panel, #tab-stock { padding: 16px; }
+  .nav-title small { display: none; }
+  .toolbar > div[style*="margin-left:auto"] { margin-left: 0 !important; width: 100%; }
+  .stats-strip { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .tscroll { height: 60vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
 </style>
 </head>
 <body>
@@ -375,31 +584,31 @@ tr.tachado td:first-child { text-decoration: none; }
 <!-- ═══ NAVBAR ════════════════════════════════════════════ -->
 <nav>
   <div class="nav-logo">
-    <img src="https://microcomp.com.mx/_next/image?url=%2Fimg%2Flogo.png&w=256&q=75" alt="MC Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-    <span style="display:none;font-family:'Barlow',sans-serif;font-weight:800;font-size:1.3rem;background:linear-gradient(135deg,#00c8e0,#1a7fe0);-webkit-background-clip:text;-webkit-text-fill-color:transparent">MC</span>
+    <img src="https://microcomp.com.mx/_next/image?url=%2Fimg%2Flogo.png&w=256&q=75" alt="MC Microcomputación" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+    <span style="display:none;font-family:'Maven Pro','Myriad Pro',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-0.5px;color:var(--mc-blue);padding-right:12px">M<span style="color:var(--mc-green)">C</span></span>
     <div class="nav-divider"></div>
-    <span class="nav-title">Gestor de Inventario Rezagado</span>
+    <span class="nav-title">Gestor de Inventario Rezagado<small>Control de inventario y rezago</small></span>
   </div>
-  <div style="display:flex;align-items:center;gap:10px;">
-    <span id="navFileName" style="display:none;font-size:0.68rem;color:var(--text3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-    <button id="navSyncBtn" onclick="syncData()" style="display:none;background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Sincronizar cambios del equipo">🔄 Sincronizar</button>
-    <button id="navChangeFile" onclick="document.getElementById('fileInput').click()" style="display:none;background:none;border:1px solid var(--cyan);color:var(--cyan);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;">📂 Cambiar archivo</button>
-    <button id="navPublishBtn" onclick="openGHModal()" style="display:none;background:none;border:1px solid var(--green);color:var(--green);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Publicar este Excel para que todo el equipo lo vea">☁️ Publicar para todos</button>
-    <button id="navResetBtn" onclick="openResetModal()" style="display:none;background:none;border:1px solid var(--red);color:var(--red);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Reiniciar todo el historial">🗑 Reiniciar</button>
-    <button id="navSaveBtn" onclick="saveAll()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.2s;" title="Guarda localmente y sincroniza con el equipo en GitHub">💾 Guardar</button>
+  <div class="nav-actions">
+    <span id="navFileName" style="display:none"></span>
+    <button id="navSyncBtn" class="btn btn-ghost" onclick="syncData()" style="display:none" title="Sincronizar cambios del equipo">🔄 Sincronizar</button>
+    <button id="navChangeFile" class="btn btn-accent" onclick="document.getElementById('fileInput').click()" style="display:none">📂 Cambiar archivo</button>
+    <button id="navPublishBtn" class="btn btn-success" onclick="openGHModal()" style="display:none" title="Publicar este Excel para que todo el equipo lo vea">☁️ Publicar para todos</button>
+    <button id="navResetBtn" class="btn btn-danger" onclick="openResetModal()" style="display:none" title="Reiniciar todo el historial">🗑 Reiniciar</button>
+    <button id="navSaveBtn" class="btn btn-primary" onclick="saveAll()" title="Guarda localmente y sincroniza con el equipo en GitHub">💾 Guardar</button>
     <span class="nav-badge">Interno</span>
   </div>
 </nav>
 
 <!-- ═══ RESET MODAL ════════════════════════════════════════ -->
-<div id="resetModal" style="display:none;position:fixed;inset:0;background:rgba(8,9,12,0.92);z-index:400;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:var(--surface);border:1px solid rgba(232,75,58,0.4);border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);background:rgba(232,75,58,0.08);">
-      <span style="font-family:'Barlow',sans-serif;font-weight:700;font-size:1rem;color:var(--red);">🗑 Reiniciar historial</span>
-      <button onclick="closeResetModal()" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;">✕</button>
+<div id="resetModal" style="display:none;position:fixed;inset:0;background:rgba(10,40,52,0.55);z-index:400;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border:1px solid rgba(192,57,43,0.4);border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 24px 60px rgba(0,42,56,0.20);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);background:rgba(192,57,43,0.08);">
+      <span style="font-family:'Maven Pro','Myriad Pro',sans-serif;font-weight:700;font-size:1rem;color:var(--red);">🗑 Reiniciar historial</span>
+      <button class="modal-close" onclick="closeResetModal()" aria-label="Cerrar">✕</button>
     </div>
     <div style="padding:22px;">
-      <div style="font-size:0.8rem;color:var(--text2);margin-bottom:18px;line-height:1.7;padding:12px 14px;background:rgba(232,75,58,0.06);border:1px solid rgba(232,75,58,0.2);border-radius:8px;">
+      <div style="font-size:0.8rem;color:var(--text2);margin-bottom:18px;line-height:1.7;padding:12px 14px;background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.2);border-radius:8px;">
         ⚠️ Esta acción <strong style="color:var(--red)">borrará permanentemente</strong> todo el historial:<br>
         tachados, cobros, GU entregados/vendidos, comentarios, responsables y plataformas.<br>
         <strong style="color:var(--text)">No se puede deshacer.</strong>
@@ -413,7 +622,7 @@ tr.tachado td:first-child { text-decoration: none; }
           <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetCobr" checked style="accent-color:var(--red)"> Por Cobrar e historial de cobros</label>
           <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetGU"   checked style="accent-color:var(--red)"> GU Por Entregar y Entregado a GU</label>
           <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetPlat" checked style="accent-color:var(--red)"> Plataformas (piezas ML)</label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetComm" checked style="accent-color:var(--red)"> Comentarios y Responsables</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text2);cursor:pointer;"><input type="checkbox" id="resetComm" checked style="accent-color:var(--red)"> Comentarios, Responsables, Cliente y Fecha de facturación</label>
         </div>
       </div>
 
@@ -421,22 +630,22 @@ tr.tachado td:first-child { text-decoration: none; }
       <div>
         <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:600;">Contraseña de administrador</div>
         <input type="password" id="resetPassword" placeholder="Ingresa la contraseña…"
-          style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:0.82rem;padding:9px 12px;border-radius:6px;outline:none;"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'Maven Pro','Myriad Pro',sans-serif;font-size:0.82rem;padding:9px 12px;border-radius:6px;outline:none;"
           onkeydown="if(event.key==='Enter') doReset()">
         <div id="resetError" style="display:none;font-size:0.7rem;color:var(--red);margin-top:6px;">❌ Contraseña incorrecta</div>
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--border);background:var(--surface2);">
-      <button onclick="closeResetModal()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;">Cancelar</button>
-      <button onclick="doReset()" style="background:var(--red);border:none;color:#fff;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;">🗑 Reiniciar ahora</button>
+      <button class="btn btn-ghost" onclick="closeResetModal()">Cancelar</button>
+      <button class="btn" onclick="doReset()" style="background:var(--red);color:#fff">🗑 Reiniciar ahora</button>
     </div>
   </div>
 </div>
-<div id="ghModal" style="display:none;position:fixed;inset:0;background:rgba(8,9,12,0.92);z-index:400;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+<div id="ghModal" style="display:none;position:fixed;inset:0;background:rgba(10,40,52,0.55);z-index:400;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 24px 60px rgba(0,42,56,0.20);">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);background:var(--surface2);">
-      <span style="font-family:'Barlow',sans-serif;font-weight:700;font-size:1rem;">☁️ Publicar Excel para el equipo</span>
-      <button onclick="closeGHModal()" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;">✕</button>
+      <span style="font-family:'Maven Pro','Myriad Pro',sans-serif;font-weight:700;font-size:1rem;">☁️ Publicar Excel para el equipo</span>
+      <button class="modal-close" onclick="closeGHModal()" aria-label="Cerrar">✕</button>
     </div>
     <div style="padding:22px;">
       <div style="font-size:0.78rem;color:var(--text2);margin-bottom:18px;line-height:1.6;">
@@ -444,7 +653,7 @@ tr.tachado td:first-child { text-decoration: none; }
         <strong style="color:var(--text)">¿Solo quieres conectarte?</strong> El repo ya está configurado — cierra este modal y recarga la página.
       </div>
       <!-- Solo info, no se necesita config adicional -->
-      <div style="padding:14px 16px;background:rgba(0,200,224,0.06);border:1px solid rgba(0,200,224,0.2);border-radius:8px;margin-bottom:18px;">
+      <div style="padding:14px 16px;background:rgba(0,132,174,0.06);border:1px solid rgba(0,132,174,0.2);border-radius:8px;margin-bottom:18px;">
         <div style="font-size:0.72rem;color:var(--cyan);font-weight:600;margin-bottom:4px;">✓ Conectado a GitHub</div>
         <div style="font-size:0.7rem;color:var(--text2);">Repositorio: <strong style="color:var(--text)">miauchii/Inventario-mc</strong></div>
         <div style="font-size:0.7rem;color:var(--text2);margin-top:2px;">Los cambios se sincronizan automáticamente al presionar 💾 Guardar</div>
@@ -457,8 +666,8 @@ tr.tachado td:first-child { text-decoration: none; }
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--border);background:var(--surface2);">
-      <button onclick="closeGHModal()" style="background:none;border:1px solid var(--border2);color:var(--text2);font-family:'Inter',sans-serif;font-size:0.73rem;padding:7px 16px;border-radius:6px;cursor:pointer;">Cancelar</button>
-      <button onclick="publishToGitHub()" id="ghPublishBtn" style="background:linear-gradient(135deg,var(--green),#16a34a);border:none;color:#fff;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;">☁️ Subir y publicar</button>
+      <button class="btn btn-ghost" onclick="closeGHModal()">Cancelar</button>
+      <button class="btn" onclick="publishToGitHub()" id="ghPublishBtn" style="background:var(--green-br);color:#fff">☁️ Subir y publicar</button>
     </div>
   </div>
 </div>
@@ -467,19 +676,21 @@ tr.tachado td:first-child { text-decoration: none; }
 <main>
 
   <!-- UPLOAD -->
-  <div id="uploadZone" onclick="document.getElementById('fileInput').click()">
+  <div id="uploadZone" role="button" tabindex="0" aria-label="Cargar archivo de Excel"
+       onclick="document.getElementById('fileInput').click()"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('fileInput').click();}">
     <span class="upload-icon">📊</span>
     <div class="upload-title">Arrastra tu Excel aquí o haz clic para seleccionar</div>
     <div class="upload-sub" style="margin-top:6px">Formato .xlsx · El archivo se guarda automáticamente para la próxima visita</div>
     <input type="file" id="fileInput" accept=".xlsx,.xls">
   </div>
   <!-- GitHub quick-config for new browsers -->
-  <div id="ghQuickConfig" style="display:none;margin-top:14px;padding:14px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+  <div id="ghQuickConfig" class="gh-quick" style="display:none">
     <div>
       <div style="font-size:0.75rem;color:var(--text);font-weight:600;margin-bottom:3px;">☁️ ¿Tu equipo ya tiene un Excel publicado en GitHub?</div>
       <div style="font-size:0.68rem;color:var(--text2);">Configura el repositorio una vez y la app lo cargará automáticamente sin pedir el archivo.</div>
     </div>
-    <button onclick="openGHModal();event.stopPropagation()" style="background:linear-gradient(135deg,var(--cyan),var(--blue2));border:none;color:#000;font-family:'Inter',sans-serif;font-size:0.73rem;font-weight:700;padding:8px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;">⚙️ Configurar GitHub</button>
+    <button class="btn btn-primary" onclick="openGHModal();event.stopPropagation()" style="flex-shrink:0">⚙️ Configurar GitHub</button>
   </div>
   <div id="statusBar"><div class="status-dot"></div><span id="statusText">Cargando…</span></div>
 
@@ -488,7 +699,7 @@ tr.tachado td:first-child { text-decoration: none; }
 
     <!-- STATS -->
     <!-- TOGGLE ALMACENES ESPECIALES -->
-    <div id="exclAlmBar" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;">
+    <div id="exclAlmBar" class="filter-bar">
       <span style="font-size:0.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Incluir en totales:</span>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.72rem;color:var(--text2);user-select:none;">
         <span style="position:relative;display:inline-block;width:38px;height:20px;flex-shrink:0">
@@ -498,7 +709,7 @@ tr.tachado td:first-child { text-decoration: none; }
         </span>
         <span id="toggleExclText">ALM DEMO · GEAR UP · OPEN BOX · PLATAFORMAS · ML QRO · AMAZON QRO</span>
       </label>
-      <span id="toggleExclNote" style="font-size:0.62rem;padding:2px 7px;border-radius:3px;background:rgba(232,75,58,0.1);color:var(--red);border:1px solid rgba(232,75,58,0.2);">excluidos</span>
+      <span id="toggleExclNote" style="font-size:0.62rem;padding:2px 7px;border-radius:3px;background:rgba(192,57,43,0.1);color:var(--red);border:1px solid rgba(192,57,43,0.2);">excluidos</span>
     </div>
 
     <div class="stats-strip">
@@ -511,6 +722,10 @@ tr.tachado td:first-child { text-decoration: none; }
       <div class="stat-card c-blue"><div class="stat-label">Valor rezagado (MC·CC)</div><div class="stat-value blue" id="statValor">—</div></div>
       <div class="stat-card c-orange"><div class="stat-label">Arrendamientos (ADV)</div><div class="stat-value orange" id="statValorAdv">—</div></div>
     </div>
+
+    <!-- TOTALES POR EQUIPO COMERCIAL -->
+    <div class="team-strip-head">Valor de inventario por equipo comercial <span>· clic en un equipo para abrirlo prefiltrado en Base de Datos</span></div>
+    <div class="team-strip" id="teamStrip"></div>
 
     <!-- TABS -->
     <div class="tabs-wrap">
@@ -537,21 +752,19 @@ tr.tachado td:first-child { text-decoration: none; }
     <!-- ══ TAB: BDD ═══════════════════════════════════════ -->
     <div id="tab-bdd" class="tab-panel active">
       <div class="toolbar">
-        <span class="tlabel">Buscar:</span>
-        <input type="text" id="searchBdd" placeholder="Código, artículo, vendedor…" oninput="debouncedRenderBDD()" style="width:200px">
-        <span class="tlabel" style="margin-left:6px">Clasificación:</span>
-        <select id="filterClasifBdd" onchange="renderBDD()"><option value="">Todas</option></select>
-        <span class="tlabel" style="margin-left:6px">Vendedor:</span>
-        <select id="filterVendBdd" onchange="renderBDD()"><option value="">Todos</option></select>
-        <span class="tlabel" style="margin-left:6px">Estado:</span>
-        <select id="filterEstadoBdd" onchange="renderBDD()">
+        <div class="field"><span class="tlabel">Buscar:</span> <input type="text" id="searchBdd" placeholder="Código, artículo, vendedor…" oninput="debouncedRenderBDD()" style="width:200px"></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Clasificación:</span> <select id="filterClasifBdd" onchange="renderBDD()"><option value="">Todas</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Vendedor:</span> <select id="filterVendBdd" onchange="renderBDD()"><option value="">Todos</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Estado:</span> <select id="filterEstadoBdd" onchange="renderBDD()">
           <option value="">Todos</option>
           <option value="rez">Solo rezagados</option>
           <option value="ok">Sin rezago</option>
-        </select>
+        </select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Equipo comercial:</span> <select id="filterEquipoBdd" onchange="renderBDD()"><option value="">Todos los equipos</option><option value="CDMX">CDMX</option><option value="BAJIO">Bajío</option><option value="TECHSALES">TechSales</option><option value="SENIOR">Senior</option><option value="SIN EQUIPO">Sin equipo</option></select></div>
         <div style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn btn-success" id="btnExportEquipo" onclick="exportEquipo()" title="Exporta solo el equipo comercial seleccionado, con semáforo de antigüedad">⬇ Exportar equipo</button>
           <button class="btn btn-ghost" onclick="exportBddFiltrado()">⬇ Excel filtrado</button>
-          <button class="btn btn-ghost" onclick="openCopyModal()" style="border-color:var(--cyan);color:var(--cyan)">📋 Copiar para Outlook</button>
+          <button class="btn btn-accent" onclick="openCopyModal()">📋 Copiar para Outlook</button>
         </div>
       </div>
       <div class="table-wrap"><div class="tscroll" id="scrollBdd">
@@ -559,10 +772,11 @@ tr.tachado td:first-child { text-decoration: none; }
           <thead><tr>
             <th>Empresa</th><th>Almacén</th><th>Código</th><th style="color:var(--cyan)">Vendedor</th><th>Artículo</th>
             <th>N° Parte</th><th>UM</th><th>Clasificación</th><th>Últ. Movimiento</th>
-            <th style="background:rgba(0,200,224,0.06)">Última Compra</th>
+            <th style="background:rgba(0,132,174,0.06)">Última Compra</th>
             <th class="r">Costo Unitario</th><th class="r">Existencia</th><th class="r">Valor Inventario</th>
             <th class="col-purple">Fecha Efectiva</th><th class="col-purple" style="font-size:0.52rem">Origen</th>
             <th class="r">Meses Rezago</th><th>Estado</th><th>Comentario</th>
+            <th>Cliente</th><th>Fecha Facturación</th><th>Equipo Comercial</th>
           </tr></thead>
           <tbody id="tbodyBdd"></tbody>
         </table>
@@ -572,16 +786,14 @@ tr.tachado td:first-child { text-decoration: none; }
     <!-- ══ TAB: REZAGADOS ════════════════════════════════ -->
     <div id="tab-rezagados" class="tab-panel">
       <div class="toolbar">
-        <span class="tlabel">Clasificación:</span>
-        <select id="filterClasifRez" onchange="renderRezagados()"><option value="">Todas</option></select>
-        <span class="tlabel" style="margin-left:6px">Vendedor:</span>
-        <select id="filterVendRez" onchange="renderRezagados()"><option value="">Todos</option></select>
-        <span class="tlabel" style="margin-left:6px">Ver:</span>
-        <select id="filterEstadoRez" onchange="renderRezagados()">
+        <div class="field"><span class="tlabel">Clasificación:</span> <select id="filterClasifRez" onchange="renderRezagados()"><option value="">Todas</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Vendedor:</span> <select id="filterVendRez" onchange="renderRezagados()"><option value="">Todos</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Ver:</span> <select id="filterEstadoRez" onchange="renderRezagados()">
           <option value="pendientes">Solo pendientes</option>
           <option value="todos">Todos</option>
           <option value="descontados">Solo descontados</option>
-        </select>
+        </select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Equipo comercial:</span> <select id="filterEquipoRez" onchange="renderRezagados()"><option value="">Todos los equipos</option><option value="CDMX">CDMX</option><option value="BAJIO">Bajío</option><option value="TECHSALES">TechSales</option><option value="SENIOR">Senior</option><option value="SIN EQUIPO">Sin equipo</option></select></div>
         <div style="margin-left:auto;display:flex;gap:8px;">
           <button class="btn btn-danger" onclick="resetDescontados()">↩ Reiniciar</button>
           <button class="btn btn-ghost" onclick="undoSection('rezagados')" title="Deshacer último cambio">⟲ Deshacer</button>
@@ -599,6 +811,7 @@ tr.tachado td:first-child { text-decoration: none; }
             <th class="r">Meses Rezago</th><th class="r">Costo Unitario</th>
             <th class="r">Existencia</th><th class="r">Valor Inventario</th>
             <th>Estado</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
+            <th>Cliente</th><th>Fecha Facturación</th><th>Equipo Comercial</th>
           </tr></thead>
           <tbody id="tbodyRez"></tbody>
           <tfoot id="tfootRez"></tfoot>
@@ -617,16 +830,13 @@ tr.tachado td:first-child { text-decoration: none; }
     <!-- ══ TAB: VALOR POR AÑO ════════════════════════════ -->
     <div id="tab-anual" class="tab-panel">
       <div class="toolbar">
-        <span class="tlabel">Clasificación:</span>
-        <select id="filterClasifAnual" onchange="renderAnual()"><option value="">Todas</option></select>
-        <span class="tlabel" style="margin-left:6px">Vendedor:</span>
-        <select id="filterVendAnual" onchange="renderAnual()"><option value="">Todos</option></select>
-        <span class="tlabel" style="margin-left:6px">Mostrar:</span>
-        <select id="filterTipoAnual" onchange="renderAnual()">
+        <div class="field"><span class="tlabel">Clasificación:</span> <select id="filterClasifAnual" onchange="renderAnual()"><option value="">Todas</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Vendedor:</span> <select id="filterVendAnual" onchange="renderAnual()"><option value="">Todos</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Mostrar:</span> <select id="filterTipoAnual" onchange="renderAnual()">
           <option value="todos">Todos los productos</option>
           <option value="rez">Solo rezagados</option>
           <option value="ok">Solo no rezagados</option>
-        </select>
+        </select></div>
       </div>
       <div class="year-layout">
         <div class="chart-card">
@@ -670,11 +880,10 @@ tr.tachado td:first-child { text-decoration: none; }
     <!-- ══ TAB: POR EMPRESA ══════════════════════════════ -->
     <div id="tab-empresa" class="tab-panel">
       <div class="toolbar">
-        <span class="tlabel">Ver:</span>
-        <select id="filterTipoEmp" onchange="renderEmpresa()">
+        <div class="field"><span class="tlabel">Ver:</span> <select id="filterTipoEmp" onchange="renderEmpresa()">
           <option value="total">Valor total de inventario</option>
           <option value="rez">Solo rezagados</option>
-        </select>
+        </select></div>
       </div>
       <div class="emp-cards" id="empresaCards"></div>
       <div class="table-wrap">
@@ -693,7 +902,7 @@ tr.tachado td:first-child { text-decoration: none; }
       <div id="empDrillPanel" style="display:none;margin-top:20px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
         <div class="drill-header">
           <div class="drill-title">Inventario de <span id="empDrillName" style="color:var(--cyan)">—</span>
-            <span id="empDrillCount" style="font-size:0.72rem;color:var(--text2);font-family:'Inter',sans-serif;font-weight:400;margin-left:10px"></span>
+            <span id="empDrillCount" style="font-size:0.72rem;color:var(--text2);font-family:'Maven Pro','Myriad Pro',sans-serif;font-weight:400;margin-left:10px"></span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <select id="empDrillFiltro" onchange="renderEmpDrill()" style="font-size:0.72rem;padding:5px 9px;">
@@ -723,16 +932,13 @@ tr.tachado td:first-child { text-decoration: none; }
     <!-- ══ TAB: STOCK POR ALMACÉN ═══════════════════════ -->
     <div id="tab-stock" class="tab-panel">
       <div class="toolbar">
-        <span class="tlabel">Buscar:</span>
-        <input type="text" id="searchStock" placeholder="Código o artículo…" oninput="debouncedRenderStock()" style="width:200px">
-        <span class="tlabel" style="margin-left:6px">Clasificación:</span>
-        <select id="filterClasifStock" onchange="renderStock()"><option value="">Todas</option></select>
-        <span class="tlabel" style="margin-left:6px">Mostrar:</span>
-        <select id="filterStockMostrar" onchange="renderStock()">
+        <div class="field"><span class="tlabel">Buscar:</span> <input type="text" id="searchStock" placeholder="Código o artículo…" oninput="debouncedRenderStock()" style="width:200px"></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Clasificación:</span> <select id="filterClasifStock" onchange="renderStock()"><option value="">Todas</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Mostrar:</span> <select id="filterStockMostrar" onchange="renderStock()">
           <option value="con_stock">Con stock en algún almacén</option>
           <option value="todos">Todos los productos</option>
           <option value="multi">En más de un almacén</option>
-        </select>
+        </select></div>
         <div style="margin-left:auto;display:flex;gap:8px;">
           <button class="btn btn-ghost" onclick="exportStock()">⬇ Exportar Excel</button>
         </div>
@@ -755,7 +961,7 @@ tr.tachado td:first-child { text-decoration: none; }
       <!-- SAVE BAR -->
       <div id="platSaveBar" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:18px;gap:12px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span style="font-size:0.72rem;color:var(--text2)">🛒 Piezas de productos entregados a GU publicadas en <strong style="color:#ffce44">Mercado Libre</strong>. Los cambios se guardan con el botón global 💾 Guardar.</span>
+          <span style="font-size:0.72rem;color:var(--text2)">🛒 Piezas de productos entregados a GU publicadas en <strong style="color:#a67c00">Mercado Libre</strong>. Los cambios se guardan con el botón global 💾 Guardar.</span>
           <span id="platUnsaved" style="display:none;font-size:0.68rem;color:var(--amber);font-weight:600;">● Cambios sin guardar</span>
           <span id="platSavedOk" style="display:none;font-size:0.68rem;color:var(--green);">✓ Guardado</span>
         </div>
@@ -764,19 +970,15 @@ tr.tachado td:first-child { text-decoration: none; }
 
       <!-- TOOLBAR -->
       <div class="toolbar">
-        <span class="tlabel">Buscar:</span>
-        <input type="text" id="searchPlat" placeholder="Código o artículo…" oninput="debouncedRenderPlat()" style="width:200px">
-        <span class="tlabel" style="margin-left:6px">Clasificación:</span>
-        <select id="filterClasifPlat" onchange="renderPlat()"><option value="">Todas</option></select>
-        <span class="tlabel" style="margin-left:6px">Vendedor:</span>
-        <select id="filterVendPlat" onchange="renderPlat()"><option value="">Todos</option></select>
-        <span class="tlabel" style="margin-left:6px">Ver:</span>
-        <select id="filterPlatVer" onchange="renderPlat()">
+        <div class="field"><span class="tlabel">Buscar:</span> <input type="text" id="searchPlat" placeholder="Código o artículo…" oninput="debouncedRenderPlat()" style="width:200px"></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Clasificación:</span> <select id="filterClasifPlat" onchange="renderPlat()"><option value="">Todas</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Vendedor:</span> <select id="filterVendPlat" onchange="renderPlat()"><option value="">Todos</option></select></div>
+        <div class="field"><span class="tlabel" style="margin-left:6px">Ver:</span> <select id="filterPlatVer" onchange="renderPlat()">
           <option value="todos">Todos los entregados a GU</option>
           <option value="ml">Con piezas en ML</option>
           <option value="ninguna">Sin piezas en ML</option>
           <option value="sobrante">Con piezas sin asignar</option>
-        </select>
+        </select></div>
         <div style="margin-left:auto">
           <button class="btn btn-ghost" onclick="exportPlat()">⬇ Exportar Excel</button>
         </div>
@@ -795,7 +997,7 @@ tr.tachado td:first-child { text-decoration: none; }
               <th>Clasificación</th>
               <th style="color:var(--cyan)">Vendedor</th>
               <th class="r" style="min-width:80px">Existencia</th>
-              <th style="min-width:120px;text-align:center;color:#ffce44">
+              <th style="min-width:120px;text-align:center;color:#a67c00">
                 <img src="https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/favicon.png" style="height:12px;vertical-align:middle;margin-right:4px" onerror="this.style.display='none'">Mercado Libre
               </th>
               <th style="min-width:100px;text-align:center;color:var(--cyan)">Distribuido</th>
@@ -816,8 +1018,7 @@ tr.tachado td:first-child { text-decoration: none; }
       📦 Productos listos para entregar a GU. <strong>Desde Rezagados:</strong> aparece aquí después del primer cobro registrado en Por Cobrar. <strong>Desde Inventario Físico:</strong> aparece aquí inmediatamente al ser marcado. Marca <strong>✓ Entregado</strong> cuando el producto haya sido físicamente entregado.
     </div>
     <div class="toolbar">
-      <span class="tlabel">Buscar:</span>
-      <input type="text" id="searchPoEntregar" placeholder="Código o artículo…" oninput="renderPoEntregar()" style="width:200px">
+      <div class="field"><span class="tlabel">Buscar:</span> <input type="text" id="searchPoEntregar" placeholder="Código o artículo…" oninput="renderPoEntregar()" style="width:200px"></div>
       <div style="margin-left:auto;display:flex;gap:8px;">
         <button class="btn btn-ghost" onclick="undoSection('poentregar')" title="Deshacer último cambio">⟲ Deshacer</button>
         <button class="btn btn-ghost" onclick="exportPoEntregar()">⬇ Exportar Excel</button>
@@ -831,6 +1032,7 @@ tr.tachado td:first-child { text-decoration: none; }
           <th>Clasificación</th><th>Última Compra</th>
           <th class="r">Meses Rezago</th><th class="r">Existencia</th>
           <th class="r">Valor Inv.</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
+          <th>Cliente</th><th>Fecha Facturación</th><th>Equipo Comercial</th>
         </tr></thead>
         <tbody id="tbodyPoEntregar"></tbody>
         <tfoot id="tfootPoEntregar"></tfoot>
@@ -844,8 +1046,7 @@ tr.tachado td:first-child { text-decoration: none; }
       ✅ Productos entregados a GU. Marca <strong style="color:var(--green)">Vendido</strong> cuando el producto haya sido vendido — se moverá a la sección <strong>Vendidos</strong> al fondo de esta misma página.
     </div>
     <div class="toolbar">
-      <span class="tlabel">Buscar:</span>
-      <input type="text" id="searchEntregado" placeholder="Código o artículo…" oninput="renderEntregadoGU()" style="width:200px">
+      <div class="field"><span class="tlabel">Buscar:</span> <input type="text" id="searchEntregado" placeholder="Código o artículo…" oninput="renderEntregadoGU()" style="width:200px"></div>
       <div style="margin-left:auto;display:flex;gap:8px;">
         <button class="btn btn-ghost" onclick="undoSection('entregadogu')" title="Deshacer último cambio">⟲ Deshacer</button>
         <button class="btn btn-ghost" onclick="exportEntregadoGU()">⬇ Exportar Excel</button>
@@ -853,7 +1054,7 @@ tr.tachado td:first-child { text-decoration: none; }
     </div>
 
     <!-- PENDIENTES DE VENTA -->
-    <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">
+    <div class="section-head">
       📋 Pendientes de venta
     </div>
     <div class="table-wrap"><div class="tscroll" id="scrollEntregado">
@@ -863,7 +1064,8 @@ tr.tachado td:first-child { text-decoration: none; }
           <th style="color:var(--cyan)">Vendedor</th><th>Artículo</th>
           <th>Clasificación</th><th>Fecha Entrega</th>
           <th class="r">Meses Rezago</th><th class="r">Existencia</th>
-          <th class="r">Valor Inv.</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th><th>↩</th>
+          <th class="r">Valor Inv.</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
+          <th>Cliente</th><th>Fecha Facturación</th><th>Equipo Comercial</th><th>↩</th>
         </tr></thead>
         <tbody id="tbodyEntregado"></tbody>
         <tfoot id="tfootEntregado"></tfoot>
@@ -872,7 +1074,7 @@ tr.tachado td:first-child { text-decoration: none; }
 
     <!-- VENDIDOS SECTION -->
     <div style="margin-top:32px;padding-top:24px;border-top:2px solid var(--border)">
-      <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.8rem;color:var(--green);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">
+      <div class="section-head" style="color:var(--green)">
         ✅ Vendidos
       </div>
       <div class="table-wrap">
@@ -881,7 +1083,8 @@ tr.tachado td:first-child { text-decoration: none; }
             <th>#</th><th>Código</th><th style="color:var(--cyan)">Vendedor</th>
             <th>Artículo</th><th>Clasificación</th><th>Fecha Entrega</th>
             <th>Fecha Venta</th><th class="r">Existencia</th>
-            <th class="r">Valor Inv.</th><th>Comentario</th><th>↩ Deshacer</th>
+            <th class="r">Valor Inv.</th><th>Comentario</th>
+            <th>Cliente</th><th>Fecha Facturación</th><th>Equipo Comercial</th><th>↩ Deshacer</th>
           </tr></thead>
           <tbody id="tbodyVendidos"></tbody>
         </table>
@@ -896,12 +1099,10 @@ tr.tachado td:first-child { text-decoration: none; }
       Marca ✓ para mover el producto a <strong>Por Cobrar</strong> y <strong>Por Entregar a GU</strong> simultáneamente.
     </div>
     <div class="toolbar">
-      <span class="tlabel">Buscar:</span>
-      <input type="text" id="searchInvFisico" placeholder="Código o artículo…" oninput="renderInvFisico()" style="width:200px">
-      <span class="tlabel" style="margin-left:6px">Almacén:</span>
-      <select id="filterAlmInvFisico" onchange="renderInvFisico()"><option value="">Todos</option></select>
-      <span class="tlabel" style="margin-left:6px">Clasificación:</span>
-      <select id="filterClasifInvFisico" onchange="renderInvFisico()"><option value="">Todas</option></select>
+      <div class="field"><span class="tlabel">Buscar:</span> <input type="text" id="searchInvFisico" placeholder="Código o artículo…" oninput="renderInvFisico()" style="width:200px"></div>
+      <div class="field"><span class="tlabel" style="margin-left:6px">Almacén:</span> <select id="filterAlmInvFisico" onchange="renderInvFisico()"><option value="">Todos</option></select></div>
+      <div class="field"><span class="tlabel" style="margin-left:6px">Clasificación:</span> <select id="filterClasifInvFisico" onchange="renderInvFisico()"><option value="">Todas</option></select></div>
+      <div class="field"><span class="tlabel" style="margin-left:6px">Equipo comercial:</span> <select id="filterEquipoInvFisico" onchange="renderInvFisico()"><option value="">Todos los equipos</option><option value="CDMX">CDMX</option><option value="BAJIO">Bajío</option><option value="TECHSALES">TechSales</option><option value="SENIOR">Senior</option><option value="SIN EQUIPO">Sin equipo</option></select></div>
       <div style="margin-left:auto;display:flex;gap:8px;">
         <button class="btn btn-ghost" onclick="undoSection('invfisico')" title="Deshacer último cambio">⟲ Deshacer</button>
         <button class="btn btn-ghost" onclick="exportInvFisico()">⬇ Exportar Excel</button>
@@ -915,6 +1116,7 @@ tr.tachado td:first-child { text-decoration: none; }
           <th>Almacén</th><th>Clasificación</th><th>Última Compra</th>
           <th class="r">Meses Rezago</th><th class="r">Existencia</th>
           <th class="r">Valor Inv.</th><th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
+          <th>Cliente</th><th>Fecha Facturación</th><th>Equipo Comercial</th>
         </tr></thead>
         <tbody id="tbodyInvFisico"></tbody>
         <tfoot id="tfootInvFisico"></tfoot>
@@ -928,14 +1130,13 @@ tr.tachado td:first-child { text-decoration: none; }
       💳 Productos pendientes de cobro. <strong>Desde Rezagados:</strong> aparece aquí primero — al registrar el primer cobro pasa a <strong>GU Por Entregar</strong>. <strong>Desde Inventario Físico:</strong> ya está en GU Por Entregar — aquí solo se registra el cobro. Usa <strong>↩ Regresar a Rezagados</strong> para deshacer el flujo completo.
     </div>
     <div class="toolbar">
-      <span class="tlabel">Buscar:</span>
-      <input type="text" id="searchPorCobrar" placeholder="Código o artículo…" oninput="renderPorCobrar()" style="width:200px">
+      <div class="field"><span class="tlabel">Buscar:</span> <input type="text" id="searchPorCobrar" placeholder="Código o artículo…" oninput="renderPorCobrar()" style="width:200px"></div>
       <div style="margin-left:auto;display:flex;gap:8px;">
         <button class="btn btn-ghost" onclick="undoSection('porcobrar')" title="Deshacer último cambio">⟲ Deshacer</button>
         <button class="btn btn-ghost" onclick="exportPorCobrar()">⬇ Exportar Excel</button>
       </div>
     </div>
-    <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.8rem;color:var(--amber);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">💳 Pendientes de cobro</div>
+    <div class="section-head" style="color:var(--amber)">💳 Pendientes de cobro</div>
     <div class="table-wrap"><div class="tscroll" id="scrollPorCobrar">
       <table>
         <thead><tr>
@@ -946,14 +1147,15 @@ tr.tachado td:first-child { text-decoration: none; }
           <th class="r" style="color:var(--green)">Cobrado</th>
           <th class="r" style="color:var(--amber)">Pendiente</th>
           <th style="min-width:160px;color:var(--green)">Cobrar piezas</th>
-          <th>Comentario</th><th style="color:var(--blue2)">Responsable</th><th>↩</th>
+          <th>Comentario</th><th style="color:var(--blue2)">Responsable</th>
+          <th>Cliente</th><th>Fecha Facturación</th><th>Equipo Comercial</th><th>↩</th>
         </tr></thead>
         <tbody id="tbodyPorCobrar"></tbody>
         <tfoot id="tfootPorCobrar"></tfoot>
       </table>
     </div></div>
     <div style="margin-top:28px;padding-top:20px;border-top:2px solid var(--border)">
-      <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.8rem;color:var(--green);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">✅ Cobrados — agrupados por fecha</div>
+      <div class="section-head" style="color:var(--green)">✅ Cobrados — agrupados por fecha</div>
       <div id="cobradosPorFecha"></div>
     </div>
   </div>
@@ -965,32 +1167,32 @@ tr.tachado td:first-child { text-decoration: none; }
 <!-- ══ TAB: STOCK POR ALMACÉN — injected outside main for full-width scroll -->
 <style>
 /* ─── STOCK TAB ──────────────────────────────────────── */
-#tab-stock { display:none; padding:24px; background:var(--surface); border:1px solid var(--border); border-radius:0 0 10px 10px; }
+#tab-stock { display:none; padding:22px; background:var(--surface); border:1px solid var(--border); border-radius:0 0 var(--r-md) var(--r-md); box-shadow:var(--sh-1); }
 #tab-stock.active { display:block; }
 .stock-sticky { position:sticky; left:0; z-index:3; background:var(--surface2); }
 .stock-sticky2 { position:sticky; left:0; z-index:3; }
 .alm-header { writing-mode:horizontal-tb; white-space:nowrap; }
-.stock-bar-wrap { display:flex; align-items:center; gap:5px; justify-content:flex-end; }
-.stock-bar { height:6px; border-radius:3px; min-width:2px; transition:width 0.4s; }
+.stock-bar-wrap { display:flex; align-items:center; gap:6px; justify-content:flex-end; }
+.stock-bar { height:6px; border-radius:3px; min-width:2px; transition:width .4s; }
 .stock-zero { color:var(--text3); }
-.stock-total-chip { font-size:0.65rem; font-weight:700; padding:1px 6px; border-radius:3px; background:rgba(0,200,224,0.12); color:var(--cyan); border:1px solid rgba(0,200,224,0.25); white-space:nowrap; }
-.alm-badge { display:inline-block; font-size:0.55rem; font-weight:700; padding:2px 6px; border-radius:3px; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+.stock-total-chip { font-size:0.68rem; font-weight:700; padding:2px 8px; border-radius:4px; background:rgba(0,132,174,0.10); color:var(--cyan); border:1px solid rgba(0,132,174,0.28); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.alm-badge { display:inline-block; font-size:0.56rem; font-weight:700; padding:2px 7px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
 
 /* ─── PLATAFORMAS ────────────────────────────────────── */
-.plat-mini-stat { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px 14px; display:flex; align-items:center; gap:10px; }
+.plat-mini-stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:13px 15px; display:flex; align-items:center; gap:11px; box-shadow:var(--sh-1); }
 .plat-mini-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
-.plat-mini-label { font-size:0.62rem; color:var(--text2); }
-.plat-mini-val { font-family:'Barlow',sans-serif; font-weight:800; font-size:1.2rem; }
+.plat-mini-label { font-size:0.64rem; color:var(--text2); font-weight:600; }
+.plat-mini-val { font-family:var(--font); font-weight:800; font-size:1.2rem; font-variant-numeric:tabular-nums; }
 </style>
 
 <script>
 // ── COLUMN MAP ────────────────────────────────────────────────────────────
 const COL = { empresa:0, almacen:1, codigo:2, articulo:3, nparte:4, um:5, clasificacion:6, ultMov:7, ultCompra:8, costoUnit:9, existencia:10, valorInv:11 };
 const MESES_UMBRAL = 3;
-const BAR_COLORS = ['#00c8e0','#1a7fe0','#1bc47d','#f59e0b','#a78bfa','#e84b3a','#38bdf8','#fb923c','#4ade80'];
+const BAR_COLORS = ['#005670','#0084ae','#71a850','#246681','#00acd2','#78aa65','#878787','#4f8a33','#a67c00'];
 
 // ── PERFORMANCE HELPERS ───────────────────────────────────────────────────
-const ROW_H    = 37;   // estimated px height per row
+const ROW_H    = 37;   // altura inicial estimada; cada tabla se recalibra sola
 const VIS_BUFF = 8;    // extra rows to render above/below viewport
 
 // ── VIRTUAL SCROLLER ──────────────────────────────────────────────────────
@@ -1002,6 +1204,49 @@ const VIS_BUFF = 8;    // extra rows to render above/below viewport
 function createVirtualScroller(scrollEl, tbodyEl, allRows, rowBuilder, colCount) {
   let rows = allRows;
   let rafId = null;
+  let rowH  = ROW_H;      // se mide con una fila real en el primer pintado
+  let ajustado = false;   // ya se calibró altura y se fijaron los anchos
+
+  const tabla = tbodyEl.closest('table');
+
+  // Congela el ancho de cada columna con un <colgroup>. Sin esto, el layout
+  // automático de la tabla recalcula los anchos con las filas que hay en
+  // pantalla en ese momento: al hacer scroll las columnas se recorren de lado
+  // y el encabezado deja de coincidir con su columna.
+  function fijarColumnas() {
+    if (!tabla) return false;
+    const ths = tabla.querySelectorAll('thead th');
+    if (!ths.length) return false;
+    if (tabla.dataset.colsFijas === String(ths.length)) return true;  // ya fijada con esta estructura
+    const previo = tabla.querySelector('colgroup');
+    if (previo) previo.remove();
+    tabla.style.tableLayout = '';
+    tabla.style.width = '';
+    const anchos = [...ths].map(th => th.getBoundingClientRect().width);
+    if (!anchos.length || anchos.some(w => !w)) return false;
+    const cg = document.createElement('colgroup');
+    anchos.forEach(w => {
+      const col = document.createElement('col');
+      col.style.width = w.toFixed(2) + 'px';
+      cg.appendChild(col);
+    });
+    tabla.insertBefore(cg, tabla.firstChild);
+    tabla.style.tableLayout = 'fixed';
+    tabla.style.width = anchos.reduce((s, w) => s + w, 0).toFixed(2) + 'px';
+    tabla.style.minWidth = '100%';
+    tabla.dataset.colsFijas = String(ths.length);
+    return true;
+  }
+
+  // Mide la altura real de una fila: el cálculo del scroll virtual depende de
+  // ella y cambia con la tipografía, el zoom o las columnas nuevas.
+  function medirAlturaFila() {
+    const fila = tbodyEl.querySelector('tr:not(.vs-spacer)');
+    if (!fila) return false;
+    const h = fila.getBoundingClientRect().height;
+    if (h > 0 && Math.abs(h - rowH) > 0.5) { rowH = h; return true; }
+    return false;
+  }
 
   function render() {
     const scrollTop  = scrollEl.scrollTop;
@@ -1009,12 +1254,12 @@ function createVirtualScroller(scrollEl, tbodyEl, allRows, rowBuilder, colCount)
     if (viewH === 0) return; // element not visible yet, skip
     const totalRows  = rows.length;
 
-    const firstIdx = Math.max(0, Math.floor(scrollTop / ROW_H) - VIS_BUFF);
+    const firstIdx = Math.max(0, Math.floor(scrollTop / rowH) - VIS_BUFF);
     const lastIdx  = Math.min(rows.length - 1,
-                      Math.ceil((scrollTop + viewH) / ROW_H) + VIS_BUFF);
+                      Math.ceil((scrollTop + viewH) / rowH) + VIS_BUFF);
 
-    const padTop    = firstIdx * ROW_H;
-    const padBottom = Math.max(0, (rows.length - lastIdx - 1) * ROW_H);
+    const padTop    = firstIdx * rowH;
+    const padBottom = Math.max(0, (rows.length - lastIdx - 1) * rowH);
 
     const frag = document.createDocumentFragment();
 
@@ -1042,6 +1287,15 @@ function createVirtualScroller(scrollEl, tbodyEl, allRows, rowBuilder, colCount)
 
     tbodyEl.innerHTML = '';
     tbodyEl.appendChild(frag);
+
+    // Primer pintado (o cambio de estructura): fija anchos, mide la altura
+    // real de fila y repinta si la estimación estaba equivocada.
+    if (!ajustado) {
+      const fijadas = fijarColumnas();
+      const cambio  = medirAlturaFila();
+      if (fijadas) ajustado = true;   // si la tabla aún no es visible, se reintenta
+      if (cambio || fijadas) { render(); return; }
+    }
   }
 
   function onScroll() {
@@ -1049,14 +1303,34 @@ function createVirtualScroller(scrollEl, tbodyEl, allRows, rowBuilder, colCount)
     rafId = requestAnimationFrame(render);
   }
 
+  // Al cambiar el tamaño de la ventana los anchos congelados quedan viejos
+  function onResize() {
+    if (tabla) delete tabla.dataset.colsFijas;
+    ajustado = false;
+    render();
+  }
+  const onResizeDeb = debounce(onResize, 200);
+
   scrollEl.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onResizeDeb);
 
   render(); // initial paint
 
   return {
-    setRows(newRows) { rows = newRows; scrollEl.scrollTop = 0; render(); },
+    setRows(newRows) {
+      rows = newRows; scrollEl.scrollTop = 0;
+      // Los anchos se vuelven a medir con el nuevo conjunto de filas
+      if (tabla) delete tabla.dataset.colsFijas;
+      ajustado = false;
+      render();
+    },
     refresh()        { render(); },
-    destroy()        { scrollEl.removeEventListener('scroll', onScroll); },
+    recalcular()     { if (tabla) delete tabla.dataset.colsFijas; ajustado = false; render(); },
+    destroy()        {
+      scrollEl.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResizeDeb);
+      if (tabla) { delete tabla.dataset.colsFijas; const cg = tabla.querySelector('colgroup'); if (cg) cg.remove(); tabla.style.tableLayout=''; tabla.style.width=''; tabla.style.minWidth=''; }
+    },
     getRows()        { return rows; }
   };
 }
@@ -1085,13 +1359,15 @@ function getVendedor(row) {
 const PLAT_KEY      = 'mc_inv_plataformas';
 const COMMENTS_KEY  = 'mc_inv_comments';
 const RESP_KEY      = 'mc_inv_resp';
+const CLIENTE_KEY   = 'mc_inv_cliente';
+const FACTURA_KEY   = 'mc_inv_factura';
 const DISCARDED_KEY = 'mc_inv_discarded';
 const SNAPSHOT_KEY  = 'mc_inv_snapshot';
 const EXCEL_KEY     = 'mc_inv_excel';      // base64 of last loaded .xlsx file
 const EXCEL_NAME_KEY= 'mc_inv_excel_name'; // filename of last loaded file
 
 const PLATS = [
-  { key:'ml', label:'Mercado Libre', color:'#ffce44' },
+  { key:'ml', label:'Mercado Libre', color:'#a67c00' },
 ];
 
 let platData = {};
@@ -1102,12 +1378,12 @@ let responsables = {};   // keyed by row._idx, same pattern as comments  // any 
 function markDirty() {
   globalDirty = true;
   const btn = document.getElementById('navSaveBtn');
-  if (btn) { btn.style.borderColor='var(--amber)'; btn.style.color='var(--amber)'; btn.textContent='💾 Guardar cambios ●'; }
+  if (btn) { btn.style.background='var(--amber)'; btn.style.borderColor='var(--amber)'; btn.style.color='#fff'; btn.textContent='💾 Guardar cambios ●'; }
 }
 function markClean() {
   globalDirty = false;
   const btn = document.getElementById('navSaveBtn');
-  if (btn) { btn.style.borderColor='var(--green)'; btn.style.color='var(--green)'; btn.textContent='✓ Guardado'; setTimeout(()=>{ btn.style.borderColor='var(--border2)'; btn.style.color='var(--text2)'; btn.textContent='💾 Guardar'; },2500); }
+  if (btn) { btn.style.background='var(--green-br)'; btn.style.borderColor='var(--green-br)'; btn.style.color='#fff'; btn.textContent='✓ Guardado'; setTimeout(()=>{ btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; btn.textContent='💾 Guardar'; },2500); }
 }
 
 // ── UNDO HISTORY ──────────────────────────────────────────────────────────
@@ -1129,13 +1405,19 @@ function saveAll() {
     // 2. Comments and Responsables (by código)
     const byCode = {};
     const byCodeResp = {};
+    const byCodeCliente = {};
+    const byCodeFactura = {};
     rawData.forEach(row => {
       const cod=String(row._raw[COL.codigo]||'').trim();
       if(comments[row._idx]) byCode[cod]=comments[row._idx];
       if(responsables[row._idx]) byCodeResp[cod]=responsables[row._idx];
+      if(clientes[row._idx]) byCodeCliente[cod]=clientes[row._idx];
+      if(facturas[row._idx]) byCodeFactura[cod]=facturas[row._idx];
     });
     localStorage.setItem(COMMENTS_KEY, JSON.stringify(byCode));
     localStorage.setItem(RESP_KEY, JSON.stringify(byCodeResp));
+    localStorage.setItem(CLIENTE_KEY, JSON.stringify(byCodeCliente));
+    localStorage.setItem(FACTURA_KEY, JSON.stringify(byCodeFactura));
     // 3. Discarded (by código)
     const discardedCodes = [];
     rawData.forEach(row => { if(discarded.has(row._idx)) discardedCodes.push(String(row._raw[COL.codigo]||'').trim()); });
@@ -1166,6 +1448,7 @@ function saveAll() {
     // Publish shared data to GitHub via Cloudflare Worker (no token needed)
     const sharedData = {
       comments: byCode, responsables: byCodeResp,
+      clientes: byCodeCliente, facturas: byCodeFactura,
       discarded: discardedCodes, guData, cobrarData, platData,
       savedAt: new Date().toISOString()
     };
@@ -1197,6 +1480,8 @@ async function fetchDatosFromGitHub(silent = false) {
 
     if (data.comments)     localStorage.setItem(COMMENTS_KEY,  JSON.stringify(data.comments));
     if (data.responsables) localStorage.setItem(RESP_KEY,      JSON.stringify(data.responsables));
+    if (data.clientes)     localStorage.setItem(CLIENTE_KEY,   JSON.stringify(data.clientes));
+    if (data.facturas)     localStorage.setItem(FACTURA_KEY,   JSON.stringify(data.facturas));
     if (data.discarded)    localStorage.setItem(DISCARDED_KEY, JSON.stringify(data.discarded));
     if (data.guData)     { localStorage.setItem(GU_KEY,        JSON.stringify(data.guData));     Object.assign(guData,     data.guData); }
     if (data.cobrarData) { localStorage.setItem(COBRAR_KEY,    JSON.stringify(data.cobrarData)); Object.assign(cobrarData, data.cobrarData); }
@@ -1253,6 +1538,8 @@ function restoreDiscardedByCode() {
 }
 
 let rawData = [], headers = [], discarded = new Set(), comments = {}, selectedYear = null, selectedEmp = null, selectedAlm = null;
+let clientes = {};   // keyed by row._idx — texto libre editable por el equipo
+let facturas = {};   // keyed by row._idx — fecha de facturación, texto libre
 
 // Load any previously saved plataforma data on startup
 loadPersisted();
@@ -1324,10 +1611,10 @@ function processFile(file) {
 function showApp(fileName) {
   document.getElementById('uploadZone').style.display = 'none';
   document.getElementById('appSection').style.display = 'block';
-  document.getElementById('navChangeFile').style.display = 'inline-block';
-  document.getElementById('navPublishBtn').style.display = 'inline-block';
-  document.getElementById('navSyncBtn').style.display = 'inline-block';
-  document.getElementById('navResetBtn').style.display = 'inline-block';
+  document.getElementById('navChangeFile').style.display = 'inline-flex';
+  document.getElementById('navPublishBtn').style.display = 'inline-flex';
+  document.getElementById('navSyncBtn').style.display = 'inline-flex';
+  document.getElementById('navResetBtn').style.display = 'inline-flex';
   const nameEl = document.getElementById('navFileName');
   nameEl.textContent = '📄 ' + fileName;
   nameEl.style.display = 'inline';
@@ -1372,7 +1659,12 @@ function doReset() {
   if (cobrCk) { cobrarData = {};        localStorage.removeItem(COBRAR_KEY); saveCobrarData(); }
   if (guCk)   { guData = {};            localStorage.removeItem(GU_KEY);     saveGUData(); }
   if (platCk) { platData = {};          localStorage.removeItem(PLAT_KEY); }
-  if (commCk) { comments = {}; responsables = {}; localStorage.removeItem(COMMENTS_KEY); localStorage.removeItem(RESP_KEY); }
+  if (commCk) { comments = {}; responsables = {};
+                // se vacían en el mismo objeto: las celdas ya dibujadas conservan la referencia
+                Object.keys(clientes).forEach(k => delete clientes[k]);
+                Object.keys(facturas).forEach(k => delete facturas[k]);
+                localStorage.removeItem(COMMENTS_KEY); localStorage.removeItem(RESP_KEY);
+                localStorage.removeItem(CLIENTE_KEY);  localStorage.removeItem(FACTURA_KEY); }
 
   // Clear undo stacks for reset sections
   if (rezCk)  { undoStacks.rezagados = []; }
@@ -1577,6 +1869,89 @@ function getClasif(row) {
   return m ? m[1] : cod.substring(0, 3);
 }
 
+// ══ EQUIPOS COMERCIALES ═══════════════════════════════════════════════════
+// Mapa CLASIFICACIÓN → EQUIPO COMERCIAL
+// Fuente: "Clasificacion por equipo comercial.xlsx" (25 filas, 24 claves únicas).
+// Para dar de alta una clasificación nueva basta con agregarla aquí.
+const EQUIPO_MAP = {
+  // ── CDMX (6 clasificaciones) ──
+  FPV:'CDMX', JEM:'CDMX', LCA:'CDMX', LEB:'CDMX', NCE:'CDMX', SBV:'CDMX',
+  // ── BAJÍO (12 clasificaciones) ──
+  AGB:'BAJIO', AHL:'BAJIO', JNA:'BAJIO', LAH:'BAJIO', LSR:'BAJIO', MGE:'BAJIO',
+  OPB:'BAJIO', PMS:'BAJIO', RAA:'BAJIO', RTT:'BAJIO', SPM:'BAJIO', TTR:'BAJIO',
+  // ── TECHSALES (10 clasificaciones) ──
+  ACA:'TECHSALES', ANP:'TECHSALES', BDV:'TECHSALES', ILL:'TECHSALES', LAK:'TECHSALES', LLI:'TECHSALES',
+  NSJ:'TECHSALES', SJN:'TECHSALES', VBD:'TECHSALES', VBM:'TECHSALES',
+  // ── SENIOR (26 clasificaciones) ──
+  AGD:'SENIOR', AGM:'SENIOR', AMV:'SENIOR', ASV:'SENIOR', BRG:'SENIOR', CMB:'SENIOR',
+  CUI:'SENIOR', DJM:'SENIOR', EOJ:'SENIOR', GBR:'SENIOR', GDA:'SENIOR', GMJ:'SENIOR',
+  GTR:'SENIOR', LLB:'SENIOR', MCJ:'SENIOR', MGG:'SENIOR', MLB:'SENIOR', MPF:'SENIOR',
+  MVL:'SENIOR', NGR:'SENIOR', RAM:'SENIOR', RFA:'SENIOR', RGH:'SENIOR', RGN:'SENIOR',
+  TRG:'SENIOR', VSG:'SENIOR',
+};
+const SIN_EQUIPO    = 'SIN EQUIPO';
+const EQUIPOS_ORDER = ['CDMX','BAJIO','TECHSALES','SENIOR',SIN_EQUIPO];
+const EQUIPO_LABEL  = { CDMX:'CDMX', BAJIO:'Bajío', TECHSALES:'TechSales', SENIOR:'Senior',  'SIN EQUIPO':'Sin equipo' };
+const EQUIPO_COLORS = { CDMX:'#005670', BAJIO:'#0084ae', TECHSALES:'#4f8a33', SENIOR:'#246681',  'SIN EQUIPO':'#878787' };
+
+function getEquipo(row) {
+  return EQUIPO_MAP[getClasif(row).trim().toUpperCase()] || SIN_EQUIPO;
+}
+
+function makeEquipoCell(row) {
+  const td = document.createElement('td');
+  const eq = getEquipo(row), color = EQUIPO_COLORS[eq];
+  const chip = document.createElement('span');
+  chip.className = 'equipo-chip';
+  chip.textContent = EQUIPO_LABEL[eq];
+  chip.style.color = color;
+  chip.style.background = color + '16';
+  chip.style.borderColor = color + '40';
+  td.appendChild(chip);
+  return td;
+}
+
+// ══ SEMÁFORO DE ANTIGÜEDAD ════════════════════════════════════════════════
+// Más de 3 meses detenido → ROJO · 2 a 3 meses → AMARILLO · menos de 2 → VERDE
+const SEMAFORO_LEYENDA = 'ROJO: más de 3 meses detenido · AMARILLO: 2 a 3 meses · VERDE: menos de 2 meses';
+function semaforo(meses) {
+  if (meses === null || meses === undefined || meses === '') return null;
+  if (meses >  3) return { txt:'ROJO',     solid:'C0392B', tint:'FBE4E1', font:'FFFFFF' };
+  if (meses >= 2) return { txt:'AMARILLO', solid:'E8B33C', tint:'FDF4DC', font:'14313D' };
+  return              { txt:'VERDE',    solid:'71A850', tint:'EBF3E4', font:'FFFFFF' };
+}
+
+// ══ CELDAS EDITABLES: CLIENTE Y FECHA DE FACTURACIÓN ══════════════════════
+function makeEditableCell(store, idx, placeholder, color, minWidth) {
+  const td = document.createElement('td');
+  td.className = 'comment-cell';
+  td.style.minWidth = minWidth;
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'comment-input' + (store[idx] ? ' has-comment' : '');
+  inp.style.color = store[idx] ? color : '';
+  inp.value = store[idx] || '';
+  inp.placeholder = placeholder;
+  inp.addEventListener('input', () => {
+    const v = inp.value.trim();
+    if (v) { store[idx] = v; inp.classList.add('has-comment');    inp.style.color = color; }
+    else   { delete store[idx]; inp.classList.remove('has-comment'); inp.style.color = ''; }
+    markDirty();
+  });
+  inp.addEventListener('click', e => e.stopPropagation());
+  td.appendChild(inp);
+  return td;
+}
+function makeClienteCell(idx)  { return makeEditableCell(clientes, idx, '+ cliente…',   'var(--mc-blue)', '150px'); }
+function makeFacturaCell(idx)  { return makeEditableCell(facturas, idx, 'dd/mm/aaaa…',  'var(--cyan)',    '120px'); }
+
+// Las tres columnas nuevas, en el mismo orden en todas las tablas
+function appendExtraCells(tr, row) {
+  tr.appendChild(makeClienteCell(row._idx));
+  tr.appendChild(makeFacturaCell(row._idx));
+  tr.appendChild(makeEquipoCell(row));
+}
+
 // ── COMMENT CELL ──────────────────────────────────────────────────────────
 function makeCommentCell(idx) {
   const td = document.createElement('td'); td.className = 'comment-cell';
@@ -1634,11 +2009,11 @@ function onToggleExclAlm() {
   const on = document.getElementById('toggleExclAlm').checked;
   // Update toggle visual
   document.getElementById('toggleExclTrack').style.background = on ? 'var(--cyan)' : 'var(--border2)';
-  document.getElementById('toggleExclThumb').style.cssText    = `position:absolute;top:2px;left:${on?'20px':'2px'};width:16px;height:16px;border-radius:50%;background:${on?'#000':'var(--text3)'};transition:left 0.2s;`;
+  document.getElementById('toggleExclThumb').style.cssText    = `position:absolute;top:2px;left:${on?'20px':'2px'};width:16px;height:16px;border-radius:50%;background:${on?'#ffffff':'var(--text3)'};transition:left 0.2s;`;
   document.getElementById('toggleExclNote').textContent       = on ? 'incluidos' : 'excluidos';
-  document.getElementById('toggleExclNote').style.background  = on ? 'rgba(27,196,125,0.1)' : 'rgba(232,75,58,0.1)';
+  document.getElementById('toggleExclNote').style.background  = on ? 'rgba(113,168,80,0.1)' : 'rgba(192,57,43,0.1)';
   document.getElementById('toggleExclNote').style.color       = on ? 'var(--green)' : 'var(--red)';
-  document.getElementById('toggleExclNote').style.borderColor = on ? 'rgba(27,196,125,0.3)' : 'rgba(232,75,58,0.2)';
+  document.getElementById('toggleExclNote').style.borderColor = on ? 'rgba(113,168,80,0.3)' : 'rgba(192,57,43,0.2)';
   updateStats();
 }
 
@@ -1672,6 +2047,67 @@ function updateStats() {
   document.getElementById('statValorAdv').textContent   = fmtMoney(valorRezAdv);
   document.getElementById('descSummary').textContent    = discarded.size;
   document.getElementById('valorPendiente').textContent = fmtMoney(pendVal);
+  renderEquipoCards();
+}
+
+// ══ TOTALES POR EQUIPO COMERCIAL ══════════════════════════════════════════
+function equipoTotales() {
+  // Respeta el interruptor de almacenes especiales, igual que los KPIs de arriba
+  const inclExcl = document.getElementById('toggleExclAlm')?.checked ?? false;
+  const base = inclExcl ? rawData : rawData.filter(r => !isExclAlm(r));
+  const tot = {};
+  EQUIPOS_ORDER.forEach(e => tot[e] = { claves:0, piezas:0, valor:0, rez:0, valorRez:0 });
+  base.forEach(r => {
+    const t = tot[getEquipo(r)];
+    if (!t) return;
+    const val = parseNum(r._raw[COL.valorInv]);
+    t.claves++;
+    t.piezas += parseNum(r._raw[COL.existencia]);
+    t.valor  += val;
+    if (isRezagado(r)) { t.rez++; t.valorRez += val; }
+  });
+  return tot;
+}
+
+function renderEquipoCards() {
+  const strip = document.getElementById('teamStrip');
+  if (!strip || !rawData.length) return;
+  const tot = equipoTotales();
+  const granTotal = EQUIPOS_ORDER.reduce((s,e) => s + tot[e].valor, 0);
+  const activo = document.getElementById('filterEquipoBdd')?.value || '';
+  strip.innerHTML = EQUIPOS_ORDER.map(e => {
+    const d = tot[e];
+    const pct = granTotal > 0 ? (d.valor/granTotal*100).toFixed(1) : '0.0';
+    const sel = activo === e;
+    return `<button type="button" class="team-card" style="--team-color:${EQUIPO_COLORS[e]}${sel?';border-color:'+EQUIPO_COLORS[e]:''}"
+        onclick="abrirEquipoEnBDD('${e}')"
+        title="Abrir el inventario de ${EQUIPO_LABEL[e]} prefiltrado en Base de Datos">
+      <div class="team-card-top">
+        <span class="team-card-name">${EQUIPO_LABEL[e]}</span>
+        <span class="team-card-pct">${pct}%</span>
+      </div>
+      <div class="team-card-val">${fmtMoney(d.valor)}</div>
+      <div class="team-card-sub">${d.claves.toLocaleString('es-MX')} claves · <b>${d.rez.toLocaleString('es-MX')} rezagadas</b> · ${fmtMoney(d.valorRez)}</div>
+      <div class="team-card-go">${sel ? '● Filtrado en Base de Datos — clic para quitar' : 'Ver en Base de Datos →'}</div>
+    </button>`;
+  }).join('');
+}
+
+// Clic en una tarjeta → abre Base de Datos ya filtrada por ese equipo
+function abrirEquipoEnBDD(eq) {
+  const sel = document.getElementById('filterEquipoBdd');
+  if (!sel) return;
+  const yaActivo = sel.value === eq;
+  sel.value = yaActivo ? '' : eq;
+  // Limpia el resto de filtros para que el equipo se vea completo
+  if (!yaActivo) {
+    ['searchBdd'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+    ['filterClasifBdd','filterVendBdd','filterEstadoBdd'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+  }
+  switchTab('bdd');
+  tabDirty.bdd = false;
+  renderBDD();
+  document.querySelector('.tabs-wrap')?.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 // ── VENDOR CELL ───────────────────────────────────────────────────────────
@@ -1694,18 +2130,23 @@ function renderBDD() {
   const clasif = document.getElementById('filterClasifBdd').value;
   const vend   = document.getElementById('filterVendBdd').value;
   const estado = document.getElementById('filterEstadoBdd').value;
+  const equipo = document.getElementById('filterEquipoBdd').value;
 
   let f = rawData.filter(row => {
     if (search && !row._raw.join(' ').toLowerCase().includes(search) && !getVendedor(row).toLowerCase().includes(search)) return false;
     if (clasif && String(getClasif(row)||'') !== clasif) return false;
     if (vend && getVendedor(row) !== vend) return false;
+    if (equipo && getEquipo(row) !== equipo) return false;
     if (estado==='rez' && !isRezagado(row)) return false;
     if (estado==='ok'  && isRezagado(row))  return false;
     return true;
   });
 
+  // Refresca el indicador "filtrado" de las tarjetas de equipo
+  renderEquipoCards();
+
   const tbody = document.getElementById('tbodyBdd');
-  if (!f.length) { tbody.innerHTML=`<tr><td colspan="18"><div class="empty"><div class="empty-icon">🔍</div>Sin resultados</div></td></tr>`; if(scrollers.bdd){scrollers.bdd.destroy();delete scrollers.bdd;} return; }
+  if (!f.length) { tbody.innerHTML=`<tr><td colspan="21"><div class="empty"><div class="empty-icon">🔍</div>Sin resultados</div></td></tr>`; if(scrollers.bdd){scrollers.bdd.destroy();delete scrollers.bdd;} return; }
 
   const buildBddRow = (row) => {
     const meses = calcMeses(row); const rez = meses!==null && meses>MESES_UMBRAL;
@@ -1721,7 +2162,7 @@ function renderBDD() {
     tr.appendChild(makeVendCell(row));
     [COL.articulo, COL.nparte, COL.um, COL.clasificacion, COL.ultMov, COL.ultCompra].forEach((ci,i) => {
       const td=document.createElement('td'); td.textContent=row._raw[ci]||''; td.title=row._raw[ci]||'';
-      if (i===8) td.style.background='rgba(0,200,224,0.04)';
+      if (i===8) td.style.background='rgba(0,132,174,0.04)';
       tr.appendChild(td);
     });
     [[COL.costoUnit,true],[COL.existencia,false],[COL.valorInv,true]].forEach(([ci,m]) => {
@@ -1741,10 +2182,11 @@ function renderBDD() {
     tr.appendChild(tdM);
     const tdE=document.createElement('td'); tdE.innerHTML=rez?`<span class="chip chip-red">⚠ REZ</span>`:`<span class="chip chip-ok">✓ OK</span>`; tr.appendChild(tdE);
     tr.appendChild(makeCommentCell(row._idx));
+    appendExtraCells(tr, row);
     return tr;
   };
   if (scrollers.bdd) scrollers.bdd.setRows(f);
-  else { scrollers.bdd = createVirtualScroller(document.getElementById('scrollBdd'), tbody, f, buildBddRow, 18); }
+  else { scrollers.bdd = createVirtualScroller(document.getElementById('scrollBdd'), tbody, f, buildBddRow, 21); }
 }
 
 // ── RENDER REZAGADOS ──────────────────────────────────────────────────────
@@ -1754,16 +2196,19 @@ function renderRezagados() {
   const vend   = document.getElementById('filterVendRez').value;
   const estado = document.getElementById('filterEstadoRez').value;
 
+  const equipo = document.getElementById('filterEquipoRez').value;
+
   let f = rawData.filter(isRezagado);
   if (clasif) f = f.filter(r => getClasif(r)===clasif);
   if (vend)   f = f.filter(r => getVendedor(r)===vend);
+  if (equipo) f = f.filter(r => getEquipo(r)===equipo);
   if (estado==='pendientes')  f = f.filter(r => !discarded.has(r._idx));
   else if (estado==='descontados') f = f.filter(r => discarded.has(r._idx));
   f.sort((a,b)=>(calcMeses(b)||0)-(calcMeses(a)||0));
 
   const tbody=document.getElementById('tbodyRez'), tfoot=document.getElementById('tfootRez');
   tfoot.innerHTML='';
-  if (!f.length) { tbody.innerHTML=`<tr><td colspan="15"><div class="empty"><div class="empty-icon">✅</div>No hay rezagados en esta selección</div></td></tr>`; if(scrollers.rez){scrollers.rez.destroy();delete scrollers.rez;} updateStats(); return; }
+  if (!f.length) { tbody.innerHTML=`<tr><td colspan="19"><div class="empty"><div class="empty-icon">✅</div>No hay rezagados en esta selección</div></td></tr>`; if(scrollers.rez){scrollers.rez.destroy();delete scrollers.rez;} updateStats(); return; }
 
   // Totals computed over all filtered rows (not just visible)
   let tEx=f.reduce((s,r)=>s+parseNum(r._raw[COL.existencia]),0);
@@ -1821,14 +2266,15 @@ function renderRezagados() {
     const tdE=document.createElement('td'); tdE.innerHTML=isDesc?`<span class="chip chip-desc">✗ Desc.</span>`:`<span class="chip chip-red">⚠ Pend.</span>`; tr.appendChild(tdE);
     tr.appendChild(makeCommentCell(row._idx));
     tr.appendChild(makeResponsableCell(row._idx));
+    appendExtraCells(tr, row);
     return tr;
   };
   if (scrollers.rez) scrollers.rez.setRows(f);
-  else { scrollers.rez = createVirtualScroller(document.getElementById('scrollRez'), tbody, f, buildRezRow, 15); }
+  else { scrollers.rez = createVirtualScroller(document.getElementById('scrollRez'), tbody, f, buildRezRow, 19); }
 
   if (estado!=='descontados') {
     const tr=document.createElement('tr');
-    ['','','','','TOTALES PEND.','','','','','','',fmtNum(tEx),fmtMoney(tVal),'','',''].forEach((v,i) => {
+    ['','','','','TOTALES PEND.','','','','','','',fmtNum(tEx),fmtMoney(tVal),'','','','','',''].forEach((v,i) => {
       const td=document.createElement('td'); td.textContent=v; if([11,12].includes(i)) td.style.textAlign='right'; tr.appendChild(td);
     });
     tfoot.appendChild(tr);
@@ -1929,7 +2375,7 @@ function renderDrill(yr) {
 
 // ── RENDER EMPRESA ────────────────────────────────────────────────────────
 const EMPRESAS_ORDER = ['MC','CC','GU','ADV'];
-const EMP_COLORS = {MC:'#00c8e0', CC:'#1a7fe0', GU:'#1bc47d', ADV:'#f59e0b'};
+const EMP_COLORS = {MC:'#0084ae', CC:'#005670', GU:'#4f8a33', ADV:'#a96a00'};
 
 function renderEmpresa() {
   const soloRez = document.getElementById('filterTipoEmp').value==='rez';
@@ -1950,7 +2396,7 @@ function renderEmpresa() {
   const el=document.getElementById('empresaCards'); el.innerHTML='';
   active.forEach(emp=>{
     const d=byEmp[emp]; const val=soloRez?d.valorRez:d.valor; const claves=soloRez?d.clavesRez:d.claves;
-    const pct=dispV>0?(val/dispV*100).toFixed(1):'0.0'; const color=EMP_COLORS[emp]||'#aaa'; const bw=dispV>0?Math.round(val/dispV*100):0;
+    const pct=dispV>0?(val/dispV*100).toFixed(1):'0.0'; const color=EMP_COLORS[emp]||'#878787'; const bw=dispV>0?Math.round(val/dispV*100):0;
     const card=document.createElement('div'); card.className='emp-card';
     card.style.cursor='pointer';
     card.innerHTML=`
@@ -1981,9 +2427,9 @@ function renderEmpresa() {
   active.forEach(emp=>{
     const d=byEmp[emp]; const pT=totV>0?(d.valor/totV*100).toFixed(1):'0.0'; const pR=d.valor>0?(d.valorRez/d.valor*100).toFixed(1):'0.0';
     tCl+=d.claves; tPz+=d.piezas; tVl+=d.valor; tCRz+=d.clavesRez; tVRz+=d.valorRez;
-    const color=EMP_COLORS[emp]||'#aaa'; const tr=document.createElement('tr');
+    const color=EMP_COLORS[emp]||'#878787'; const tr=document.createElement('tr');
     tr.style.cursor='pointer';
-    if (selectedEmp === emp) tr.style.background = 'rgba(0,200,224,0.08)';
+    if (selectedEmp === emp) tr.style.background = 'rgba(0,132,174,0.08)';
     tr.innerHTML=`<td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:8px;vertical-align:middle"></span><strong>${emp}</strong></td>
       <td class="r">${d.claves.toLocaleString('es-MX')}</td><td class="r">${fmtNum(d.piezas)}</td>
       <td class="r">${fmtMoney(d.valor)}</td><td class="r">${pT}%</td>
@@ -2026,7 +2472,7 @@ function closeEmpDrill() {
 function renderEmpDrill() {
   if (!selectedEmp) return;
   const filtro = document.getElementById('empDrillFiltro').value;
-  const color  = EMP_COLORS[selectedEmp] || '#aaa';
+  const color  = EMP_COLORS[selectedEmp] || '#878787';
 
   let rows = rawData.filter(r => normalizeEmp(r._raw[COL.empresa]) === selectedEmp);
   if (filtro === 'rez') rows = rows.filter(isRezagado);
@@ -2128,7 +2574,7 @@ const ALM_SHORT = {
   'MERCADO LIBRE QUERETARO':   'ML QRO',
   'VENTAS':                    'VENTAS'
 };
-const ALM_COLORS = ['#00c8e0','#1a7fe0','#1bc47d','#f59e0b','#a78bfa','#e84b3a','#38bdf8','#fb923c','#4ade80'];
+const ALM_COLORS = ['#005670','#0084ae','#71a850','#246681','#00acd2','#78aa65','#878787','#4f8a33','#a67c00'];
 
 function buildStockMatrix() {
   // Map: codigo → { articulo, clasif, vendedor, alm: { almName: qty } }
@@ -2202,7 +2648,7 @@ function renderStock() {
       </div>
       <div style="font-size:0.55rem;color:var(--text3);margin-top:2px">${colCount} prods</div>
       <div style="font-size:0.55rem;color:${ALM_COLORS[i]};margin-top:1px;opacity:0.7">▼ ver detalle</div>`;
-    th.addEventListener('mouseenter', () => th.style.background='rgba(255,255,255,0.04)');
+    th.addEventListener('mouseenter', () => th.style.background='rgba(0,132,174,0.08)');
     th.addEventListener('mouseleave', () => th.style.background='');
     th.addEventListener('click', () => { selectedAlm = alm; renderStock(); });
     hr.appendChild(th);
@@ -2265,7 +2711,7 @@ function renderStock() {
 // ── STOCK DRILL: vista detallada de un solo almacén ───────────────────────
 function renderStockDrill(search, clasif) {
   const almIdx  = ALMACENES_STOCK.indexOf(selectedAlm);
-  const color   = ALM_COLORS[almIdx] || '#aaa';
+  const color   = ALM_COLORS[almIdx] || '#878787';
   const mostrar = document.getElementById('filterStockMostrar').value;
 
   // Get raw rows for this almacen
@@ -2287,8 +2733,8 @@ function renderStockDrill(search, clasif) {
   thBack.style.cssText = 'position:sticky;left:0;z-index:3;background:var(--surface2);cursor:pointer;';
   thBack.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px">
-      <button onclick="selectedAlm=null;renderStock();" style="background:none;border:1px solid ${color};color:${color};border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.7rem;font-family:'Inter',sans-serif">← Volver al pivot</button>
-      <span style="font-family:'Barlow',sans-serif;font-weight:800;font-size:0.95rem;color:${color}">${selectedAlm}</span>
+      <button onclick="selectedAlm=null;renderStock();" style="background:none;border:1px solid ${color};color:${color};border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.7rem;font-family:'Maven Pro','Myriad Pro',sans-serif">← Volver al pivot</button>
+      <span style="font-family:'Maven Pro','Myriad Pro',sans-serif;font-weight:800;font-size:0.95rem;color:${color}">${selectedAlm}</span>
       <span style="font-size:0.68rem;color:var(--text2)">${rows.length.toLocaleString('es-MX')} productos · clic al nombre del almacén para regresar</span>
     </div>`;
   hr.appendChild(thBack);
@@ -2411,51 +2857,214 @@ function undoSection(section) {
 }
 
 
+// ══ EXPORTACIÓN A EXCEL CON SEMÁFORO DE ANTIGÜEDAD ════════════════════════
+// Rojo: más de 3 meses detenido · Amarillo: 2 a 3 meses · Verde: menos de 2 meses
+const XLS_FONT = 'Arial';
+function xlBorde() {
+  const b = { style:'thin', color:{ rgb:'FFD5DEE3' } };
+  return { top:b, bottom:b, left:b, right:b };
+}
+
+// Columnas estándar de producto para todas las exportaciones
+function colsProducto(extra) {
+  return [
+    { label:'Empresa',           w:9,  fn:r => r._raw[COL.empresa]||'' },
+    { label:'Almacén',           w:24, fn:r => r._raw[COL.almacen]||'' },
+    { label:'Código',            w:16, fn:r => r._raw[COL.codigo]||'' },
+    { label:'Vendedor',          w:28, fn:r => getVendedor(r) },
+    { label:'Equipo Comercial',  w:17, fn:r => EQUIPO_LABEL[getEquipo(r)] },
+    { label:'Artículo',          w:44, fn:r => r._raw[COL.articulo]||'' },
+    { label:'N° Parte',          w:18, fn:r => r._raw[COL.nparte]||'' },
+    { label:'UM',                w:9,  fn:r => r._raw[COL.um]||'' },
+    { label:'Clasificación',     w:13, fn:r => getClasif(r) },
+    { label:'Última Compra',     w:14, fn:r => r._raw[COL.ultCompra]||'' },
+    { label:'Fecha Efectiva',    w:14, fn:r => { const ef=effectiveDate(r); return ef?fmtDate(ef):''; } },
+    { label:'Meses Detenido',    w:14, fn:r => { const m=calcMeses(r); return m!==null?m:''; } },
+    { label:'Costo Unitario',    w:15, money:true, fn:r => parseNum(r._raw[COL.costoUnit]) },
+    { label:'Existencia',        w:12, fn:r => parseNum(r._raw[COL.existencia]) },
+    { label:'Valor Inventario',  w:17, money:true, fn:r => parseNum(r._raw[COL.valorInv]) },
+    { label:'Estado',            w:12, fn:r => isRezagado(r)?'REZAGADO':'OK' },
+    { label:'Cliente',           w:26, fn:r => clientes[r._idx]||'' },
+    { label:'Fecha Facturación', w:17, fn:r => facturas[r._idx]||'' },
+    { label:'Comentario',        w:32, fn:r => comments[r._idx]||'' },
+    { label:'Responsable',       w:22, fn:r => responsables[r._idx]||'' },
+  ].concat(extra||[]);
+}
+
+// Genera una hoja con encabezado de marca MC, filas coloreadas por antigüedad y autofiltro
+function hojaProductos(rows, cols) {
+  const header = cols.map(c => c.label).concat(['Semáforo']);
+  const aoa = [header];
+  const sems = [];
+  rows.forEach(r => {
+    const sm = semaforo(calcMeses(r));
+    aoa.push(cols.map(c => c.fn(r)).concat([sm ? sm.txt : 'SIN FECHA']));
+    sems.push(sm);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const n = header.length;
+
+  for (let c = 0; c < n; c++) {
+    const a = XLSX.utils.encode_cell({ r:0, c });
+    if (!ws[a]) continue;
+    ws[a].s = {
+      font: { name:XLS_FONT, sz:10, bold:true, color:{ rgb:'FFFFFFFF' } },
+      fill: { fgColor:{ rgb:'FF005670' } },
+      alignment: { horizontal:'center', vertical:'center', wrapText:true },
+      border: xlBorde()
+    };
+  }
+  for (let i = 0; i < sems.length; i++) {
+    const sm = sems[i];
+    for (let c = 0; c < n; c++) {
+      const a = XLSX.utils.encode_cell({ r:i+1, c });
+      if (!ws[a]) continue;
+      const esSem = (c === n-1);
+      const esNum = typeof ws[a].v === 'number';
+      ws[a].s = {
+        font: { name:XLS_FONT, sz:10, bold:esSem && !!sm,
+                color:{ rgb: esSem && sm ? 'FF'+sm.font : 'FF14313D' } },
+        fill: { fgColor:{ rgb: sm ? 'FF'+(esSem ? sm.solid : sm.tint) : 'FFFFFFFF' } },
+        alignment: { horizontal: esSem ? 'center' : (esNum ? 'right' : 'left'), vertical:'center' },
+        border: xlBorde()
+      };
+      if (cols[c] && cols[c].money) ws[a].z = '$#,##0.00';
+    }
+  }
+  ws['!cols'] = cols.map(c => ({ wch: c.w || 14 })).concat([{ wch:12 }]);
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{ r:aoa.length-1, c:n-1 } }) };
+  return ws;
+}
+
+// Hoja de leyenda del semáforo, se añade a cada libro exportado
+function hojaLeyenda(wb, titulo) {
+  const aoa = [
+    ['MC Microcomputación · ' + titulo],
+    ['Generado el', new Date().toLocaleString('es-MX')],
+    [],
+    ['SEMÁFORO DE ANTIGÜEDAD'],
+    ['ROJO',     'Más de 3 meses detenido'],
+    ['AMARILLO', 'Entre 2 y 3 meses detenido'],
+    ['VERDE',    'Menos de 2 meses detenido'],
+    ['SIN FECHA','El producto no tiene fecha de compra para calcular antigüedad'],
+    [],
+    ['Usa el autofiltro de la columna "Semáforo" para ver solo un color.'],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch:14 }, { wch:58 }];
+  const azul = { font:{ name:XLS_FONT, sz:11, bold:true, color:{rgb:'FF005670'} } };
+  ws['A1'].s = { font:{ name:XLS_FONT, sz:13, bold:true, color:{rgb:'FF005670'} } };
+  ws['A4'].s = azul;
+  [['A5','C0392B','FFFFFF'], ['A6','E8B33C','14313D'], ['A7','71A850','FFFFFF'], ['A8','878787','FFFFFF']]
+    .forEach(([addr, bg, fg]) => {
+      if (!ws[addr]) return;
+      ws[addr].s = { font:{ name:XLS_FONT, sz:10, bold:true, color:{rgb:'FF'+fg} },
+                     fill:{ fgColor:{ rgb:'FF'+bg } },
+                     alignment:{ horizontal:'center' } };
+    });
+  XLSX.utils.book_append_sheet(wb, ws, 'Leyenda');
+  return wb;
+}
+
+function nombreArchivo(base) {
+  return `${base}_${new Date().toISOString().split('T')[0]}.xlsx`;
+}
+
+// ══ EXPORTAR EQUIPO COMERCIAL ═════════════════════════════════════════════
+// Con un equipo seleccionado exporta solo ese equipo; sin selección genera
+// una hoja por equipo dentro del mismo libro.
+function exportEquipo() {
+  if (!rawData.length) { alert('Primero carga el inventario.'); return; }
+  const eq = document.getElementById('filterEquipoBdd').value;
+  const wb = XLSX.utils.book_new();
+  const cols = colsProducto();
+
+  if (eq) {
+    const rows = rawData.filter(r => getEquipo(r) === eq)
+                        .sort((a,b) => (calcMeses(b)||0)-(calcMeses(a)||0));
+    if (!rows.length) { alert(`El equipo ${EQUIPO_LABEL[eq]} no tiene productos en el inventario actual.`); return; }
+    XLSX.utils.book_append_sheet(wb, hojaProductos(rows, cols), EQUIPO_LABEL[eq].substring(0,31));
+    hojaLeyenda(wb, 'Inventario del equipo comercial ' + EQUIPO_LABEL[eq]);
+    XLSX.writeFile(wb, nombreArchivo('inventario_' + EQUIPO_LABEL[eq].toLowerCase().replace(/\s+/g,'_')));
+    return;
+  }
+
+  // Sin equipo seleccionado → una hoja por equipo + resumen
+  const tot = equipoTotales();
+  const resumen = [['Equipo Comercial','Claves','Piezas','Valor Inventario','Claves Rezagadas','Valor Rezagado']];
+  EQUIPOS_ORDER.forEach(e => resumen.push([EQUIPO_LABEL[e], tot[e].claves, tot[e].piezas, tot[e].valor, tot[e].rez, tot[e].valorRez]));
+  const wsR = XLSX.utils.aoa_to_sheet(resumen);
+  wsR['!cols'] = [{wch:18},{wch:10},{wch:12},{wch:18},{wch:18},{wch:18}];
+  for (let c = 0; c < 6; c++) {
+    const a = XLSX.utils.encode_cell({r:0,c});
+    if (ws_safe(wsR, a)) wsR[a].s = { font:{name:XLS_FONT,sz:10,bold:true,color:{rgb:'FFFFFFFF'}},
+                                      fill:{fgColor:{rgb:'FF005670'}}, alignment:{horizontal:'center'} };
+  }
+  XLSX.utils.book_append_sheet(wb, wsR, 'Resumen equipos');
+  EQUIPOS_ORDER.forEach(e => {
+    const rows = rawData.filter(r => getEquipo(r) === e)
+                        .sort((a,b) => (calcMeses(b)||0)-(calcMeses(a)||0));
+    if (!rows.length) return;
+    XLSX.utils.book_append_sheet(wb, hojaProductos(rows, cols), EQUIPO_LABEL[e].substring(0,31));
+  });
+  hojaLeyenda(wb, 'Inventario por equipo comercial');
+  XLSX.writeFile(wb, nombreArchivo('inventario_por_equipo'));
+}
+function ws_safe(ws, addr) { return !!ws[addr]; }
+
 function exportDescontados() {
   if(!discarded.size){alert('No hay productos descontados aún.');return;}
   const wb=XLSX.utils.book_new();
-  const sheet=[['Código','Vendedor','Artículo','Clasificación','Almacén','Última Compra','Fecha Efectiva','Origen','Meses Rezago','Costo Unitario','Existencia','Valor Inventario','Comentario']];
-  rawData.filter(r=>discarded.has(r._idx)).forEach(row=>{
-    const ef=effectiveDate(row);
-    sheet.push([row._raw[COL.codigo],getVendedor(row),row._raw[COL.articulo],getClasif(row),row._raw[COL.almacen],row._raw[COL.ultCompra],ef?fmtDate(ef):'',dateOriginLabel(row),calcMeses(row),parseNum(row._raw[COL.costoUnit]),parseNum(row._raw[COL.existencia]),parseNum(row._raw[COL.valorInv]),comments[row._idx]||'']);
-  });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sheet),'Descontados');
-  XLSX.writeFile(wb,`descontados_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const rows=rawData.filter(r=>discarded.has(r._idx)).sort((a,b)=>(calcMeses(b)||0)-(calcMeses(a)||0));
+  XLSX.utils.book_append_sheet(wb,hojaProductos(rows,colsProducto()),'Descontados');
+  hojaLeyenda(wb,'Productos descontados del inventario');
+  XLSX.writeFile(wb,nombreArchivo('descontados'));
 }
 
 function exportExcel() {
+  if(!rawData.length){alert('Primero carga el inventario.');return;}
   const wb=XLSX.utils.book_new();
-  // BDD
-  const bddRows=[[...headers.slice(0,12),'MESES_REZAGO','FECHA_EFECTIVA','ORIGEN_FECHA','ESTADO_REZAGO','DESCONTADO','VENDEDOR','COMENTARIO']];
-  rawData.forEach(row=>{
-    const m=calcMeses(row); const ef=effectiveDate(row);
-    bddRows.push([...row._raw.slice(0,12),m!==null?m:'',ef?fmtDate(ef):'',dateOriginLabel(row),m!==null&&m>MESES_UMBRAL?'REZAGADO':'OK',discarded.has(row._idx)?'SÍ':'NO',getVendedor(row),comments[row._idx]||'']);
-  });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(bddRows),'BDD');
-  // Rezagados
+  const cols=colsProducto();
+
+  // Hoja 1 — inventario completo
+  XLSX.utils.book_append_sheet(wb,hojaProductos(rawData,cols),'BDD');
+
+  // Hoja 2 — rezagados (respeta los filtros de la pestaña Rezagados)
   const clasifA=document.getElementById('filterClasifRez').value;
   const vendA  =document.getElementById('filterVendRez').value;
+  const equipoA=document.getElementById('filterEquipoRez').value;
   let rezRows=rawData.filter(isRezagado);
   if(clasifA)rezRows=rezRows.filter(r=>getClasif(r)===clasifA);
   if(vendA)  rezRows=rezRows.filter(r=>getVendedor(r)===vendA);
+  if(equipoA)rezRows=rezRows.filter(r=>getEquipo(r)===equipoA);
   rezRows.sort((a,b)=>(calcMeses(b)||0)-(calcMeses(a)||0));
-  const rezSheet=[['Código','Vendedor','Artículo','Clasificación','Última Compra','Fecha Efectiva','Origen','Meses Rezago','Costo Unitario','Existencia','Valor Inventario','Estado','Comentario']];
-  rezRows.forEach(row=>{const ef=effectiveDate(row); rezSheet.push([row._raw[COL.codigo],getVendedor(row),row._raw[COL.articulo],getClasif(row),row._raw[COL.ultCompra],ef?fmtDate(ef):'',dateOriginLabel(row),calcMeses(row),parseNum(row._raw[COL.costoUnit]),parseNum(row._raw[COL.existencia]),parseNum(row._raw[COL.valorInv]),discarded.has(row._idx)?'DESCONTADO':'PENDIENTE',comments[row._idx]||'']);});
-  const pend=rezRows.filter(r=>!discarded.has(r._idx));
-  rezSheet.push(['TOTALES','','','','','','',pend.reduce((s,r)=>s+parseNum(r._raw[COL.costoUnit]),0),pend.reduce((s,r)=>s+parseNum(r._raw[COL.existencia]),0),pend.reduce((s,r)=>s+parseNum(r._raw[COL.valorInv]),0),'','']);
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rezSheet),clasifA?`Rez_${clasifA}`:'Rezagados');
-  // Descontados
-  const descSheet=[['Código','Vendedor','Artículo','Clasificación','Almacén','Última Compra','Meses Rezago','Costo Unitario','Existencia','Valor Inventario','Comentario']];
-  rawData.filter(r=>discarded.has(r._idx)).forEach(row=>descSheet.push([row._raw[COL.codigo],getVendedor(row),row._raw[COL.articulo],getClasif(row),row._raw[COL.almacen],row._raw[COL.ultCompra],calcMeses(row),parseNum(row._raw[COL.costoUnit]),parseNum(row._raw[COL.existencia]),parseNum(row._raw[COL.valorInv]),comments[row._idx]||'']));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(descSheet),'Descontados');
-  // Valor por Año
+  const rezCols=colsProducto([{ label:'Descontado', w:13, fn:r=>discarded.has(r._idx)?'DESCONTADO':'PENDIENTE' }]);
+  XLSX.utils.book_append_sheet(wb,hojaProductos(rezRows,rezCols),clasifA?`Rez_${clasifA}`.substring(0,31):'Rezagados');
+
+  // Hoja 3 — descontados
+  const descRows=rawData.filter(r=>discarded.has(r._idx));
+  if(descRows.length) XLSX.utils.book_append_sheet(wb,hojaProductos(descRows,cols),'Descontados');
+
+  // Hoja 4 — resumen por equipo comercial
+  const tot=equipoTotales();
+  const eqSheet=[['Equipo Comercial','Claves','Piezas','Valor Inventario','Claves Rezagadas','Valor Rezagado']];
+  EQUIPOS_ORDER.forEach(e=>eqSheet.push([EQUIPO_LABEL[e],tot[e].claves,tot[e].piezas,tot[e].valor,tot[e].rez,tot[e].valorRez]));
+  const wsEq=XLSX.utils.aoa_to_sheet(eqSheet);
+  wsEq['!cols']=[{wch:18},{wch:10},{wch:12},{wch:18},{wch:18},{wch:18}];
+  for(let c=0;c<6;c++){const a=XLSX.utils.encode_cell({r:0,c});
+    if(wsEq[a]) wsEq[a].s={font:{name:XLS_FONT,sz:10,bold:true,color:{rgb:'FFFFFFFF'}},fill:{fgColor:{rgb:'FF005670'}},alignment:{horizontal:'center'}};}
+  XLSX.utils.book_append_sheet(wb,wsEq,'Equipos comerciales');
+
+  // Hoja 5 — valor por año
   const anSheet=[['Año','Productos','Valor Inventario','% del Total']];
   const byYr={}; rawData.forEach(row=>{const yr=getYear(row);if(!yr)return;if(!byYr[yr])byYr[yr]={c:0,v:0};byYr[yr].c++;byYr[yr].v+=parseNum(row._raw[COL.valorInv]);});
   const yks=Object.keys(byYr).map(Number).sort((a,b)=>a-b); const tV=yks.reduce((s,y)=>s+byYr[y].v,0);
   yks.forEach(yr=>anSheet.push([yr,byYr[yr].c,byYr[yr].v,tV>0?byYr[yr].v/tV:0]));
   anSheet.push(['TOTAL',yks.reduce((s,y)=>s+byYr[y].c,0),tV,1]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(anSheet),'Valor por Año');
-  XLSX.writeFile(wb,`inventario_rezagados_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+  hojaLeyenda(wb,'Reporte completo de inventario');
+  XLSX.writeFile(wb,nombreArchivo('inventario_rezagados'));
 }
 
 // ── EXPORT BDD FILTRADO ───────────────────────────────────────────────────
@@ -2464,10 +3073,12 @@ function getBddFilteredRows() {
   const clasif = document.getElementById('filterClasifBdd').value;
   const vend   = document.getElementById('filterVendBdd').value;
   const estado = document.getElementById('filterEstadoBdd').value;
+  const equipo = document.getElementById('filterEquipoBdd').value;
   return rawData.filter(row => {
     if (search && !row._raw.join(' ').toLowerCase().includes(search) && !getVendedor(row).toLowerCase().includes(search)) return false;
     if (clasif && String(getClasif(row)||'') !== clasif) return false;
     if (vend && getVendedor(row) !== vend) return false;
+    if (equipo && getEquipo(row) !== equipo) return false;
     if (estado==='rez' && !isRezagado(row)) return false;
     if (estado==='ok'  && isRezagado(row))  return false;
     return true;
@@ -2478,20 +3089,10 @@ function exportBddFiltrado() {
   const rows = getBddFilteredRows();
   if (!rows.length) { alert('No hay filas con los filtros actuales.'); return; }
   const wb = XLSX.utils.book_new();
-  const sheet = [['Empresa','Almacén','Código','Vendedor','Artículo','N° Parte','UM','Clasificación','Últ. Movimiento','Última Compra','Costo Unitario','Existencia','Valor Inventario','Fecha Efectiva','Origen Fecha','Meses Rezago','Estado','Comentario']];
-  rows.forEach(row => {
-    const m = calcMeses(row); const ef = effectiveDate(row);
-    sheet.push([
-      row._raw[COL.empresa], row._raw[COL.almacen], row._raw[COL.codigo], getVendedor(row),
-      row._raw[COL.articulo], row._raw[COL.nparte], row._raw[COL.um], getClasif(row),
-      row._raw[COL.ultMov], row._raw[COL.ultCompra],
-      parseNum(row._raw[COL.costoUnit]), parseNum(row._raw[COL.existencia]), parseNum(row._raw[COL.valorInv]),
-      ef?fmtDate(ef):'', dateOriginLabel(row), m!==null?m:'',
-      m!==null&&m>MESES_UMBRAL?'REZAGADO':'OK', comments[row._idx]||''
-    ]);
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheet), 'BDD Filtrado');
-  XLSX.writeFile(wb, `inventario_filtrado_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, hojaProductos(rows, colsProducto()), 'BDD Filtrado');
+  const eq = document.getElementById('filterEquipoBdd').value;
+  hojaLeyenda(wb, 'Base de datos filtrada' + (eq ? ' — equipo ' + EQUIPO_LABEL[eq] : ''));
+  XLSX.writeFile(wb, nombreArchivo('inventario_filtrado'));
 }
 
 // ── COPY TO OUTLOOK ───────────────────────────────────────────────────────
@@ -2525,14 +3126,14 @@ function doCopy() {
   ];
 
   // Build HTML table styled for Outlook (inline styles only)
-  const headerBg  = '#1a3a5c';
+  const headerBg  = '#005670';
   const headerClr = '#ffffff';
   const rowOdd    = '#ffffff';
-  const rowEven   = '#f4f7fb';
-  const border    = '#d0d7e3';
-  const textClr   = '#1a1a2e';
+  const rowEven   = '#f4f7f9';
+  const border    = '#dde5ea';
+  const textClr   = '#14313d';
   const rezClr    = '#c0392b';
-  const okClr     = '#1a7f4b';
+  const okClr     = '#4f8a33';
 
   let html = `<table border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11px;width:100%;min-width:900px;">`;
   // Header
@@ -2551,7 +3152,7 @@ function doCopy() {
       const val = String(c.fn(row));
       let color = textClr;
       if (c.label==='Estado')   color = rez ? rezClr : okClr;
-      if (c.label==='Vendedor') color = '#0055a5';
+      if (c.label==='Vendedor') color = '#0084ae';
       if (c.label==='Meses Rezago' && rez) color = rezClr;
       html += `<td style="background:${bg};color:${color};padding:6px 10px;border:1px solid ${border};white-space:nowrap">${val}</td>`;
     });
@@ -2566,7 +3167,7 @@ function doCopy() {
     if (c.label==='Artículo')   val = `${rows.length.toLocaleString('es-MX')} productos`;
     if (c.label==='Existencia') val = fmtNum(totalExist);
     if (c.label==='Valor Inv.') val = fmtMoney(totalValor);
-    html += `<td style="background:#0d1220;color:${headerClr};padding:7px 10px;border:1px solid ${border};font-weight:700;white-space:nowrap">${val}</td>`;
+    html += `<td style="background:#005670;color:${headerClr};padding:7px 10px;border:1px solid ${border};font-weight:700;white-space:nowrap">${val}</td>`;
   });
   html += `</tr></table>`;
 
@@ -2580,7 +3181,7 @@ function doCopy() {
 
   const fullHtml = `
     <div style="font-family:Calibri,Arial,sans-serif;margin-bottom:12px">
-      <p style="font-size:14px;font-weight:700;color:#1a3a5c;margin:0 0 4px">Inventario MC Microcomputación — ${fecha}</p>
+      <p style="font-size:14px;font-weight:700;color:#005670;margin:0 0 4px">Inventario MC Microcomputación — ${fecha}</p>
       ${filtros ? `<p style="font-size:11px;color:#555;margin:0 0 10px">${filtros}</p>` : ''}
       <p style="font-size:11px;color:#555;margin:0 0 10px">${rows.length.toLocaleString('es-MX')} productos · Valor total: ${fmtMoney(totalValor)}</p>
     </div>
@@ -2626,24 +3227,19 @@ function clearPlatData() {
 
 // Restore comments by codigo after new file load
 function restoreCommentsByCode() {
-  try {
-    const saved = localStorage.getItem(COMMENTS_KEY);
-    if (!saved) return;
-    const byCode = JSON.parse(saved);
-    rawData.forEach(row => {
-      const cod = String(row._raw[COL.codigo]||'').trim();
-      if (byCode[cod]) comments[row._idx] = byCode[cod];
-    });
-    // Also restore responsables
-    const savedR = localStorage.getItem(RESP_KEY);
-    if (savedR) {
-      const byCodeR = JSON.parse(savedR);
+  // Cada almacén se restaura por su cuenta: si uno está vacío, los demás igual se cargan
+  [[COMMENTS_KEY, comments], [RESP_KEY, responsables],
+   [CLIENTE_KEY, clientes],  [FACTURA_KEY, facturas]].forEach(([key, store]) => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (!saved) return;
+      const byCode = JSON.parse(saved);
       rawData.forEach(row => {
         const cod = String(row._raw[COL.codigo]||'').trim();
-        if (byCodeR[cod]) responsables[row._idx] = byCodeR[cod];
+        if (byCode[cod]) store[row._idx] = byCode[cod];
       });
-    }
-  } catch(e) {}
+    } catch(e) {}
+  });
 }
 
 function markPlatDirty() {
@@ -2768,17 +3364,17 @@ function renderPlat() {
       const over = total > exist;
       tdDist.textContent = `${total} / ${exist}`;
       tdDist.style.color = over ? 'var(--red)' : total === exist ? 'var(--green)' : 'var(--cyan)';
-      tr.style.background = over ? 'rgba(232,75,58,0.06)' : '';
+      tr.style.background = over ? 'rgba(192,57,43,0.06)' : '';
     };
     const tdML = document.createElement('td'); tdML.style.textAlign='center';
     const inp = document.createElement('input');
     inp.type='number'; inp.min='0'; inp.step='1'; inp.value = entry.ml || 0;
-    inp.style.cssText = `width:80px;background:var(--surface2);border:1px solid var(--border2);color:#ffce44;font-family:'Inter',sans-serif;font-size:0.76rem;font-weight:600;padding:4px 6px;border-radius:4px;text-align:center;outline:none;`;
-    inp.addEventListener('focus', () => inp.style.borderColor='#ffce44');
+    inp.style.cssText = `width:80px;background:var(--surface2);border:1px solid var(--border2);color:#a67c00;font-family:'Maven Pro','Myriad Pro',sans-serif;font-size:0.76rem;font-weight:600;padding:4px 6px;border-radius:4px;text-align:center;outline:none;`;
+    inp.addEventListener('focus', () => inp.style.borderColor='#a67c00');
     inp.addEventListener('blur',  () => inp.style.borderColor='var(--border2)');
     inp.addEventListener('input', () => {
       let val = parseInt(inp.value)||0; if(val<0)val=0;
-      if(val>exist){val=exist;inp.value=val;inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='#ffce44',1000);}
+      if(val>exist){val=exist;inp.value=val;inp.style.borderColor='var(--red)';setTimeout(()=>inp.style.borderColor='#a67c00',1000);}
       entry.ml=val; markPlatDirty(); updatePlatStats(); updateDist();
     });
     tdML.appendChild(inp); tr.appendChild(tdML);
@@ -2795,7 +3391,7 @@ function renderPlat() {
   tfoot.innerHTML = `<tr>
     <td colspan="4" style="position:sticky;left:0;background:var(--surface2)">${rows.length.toLocaleString('es-MX')} productos</td>
     <td class="r">${fmtNum(totExist)}</td>
-    <td style="text-align:center;color:#ffce44;font-weight:700">${totalML.toLocaleString('es-MX')}</td>
+    <td style="text-align:center;color:#a67c00;font-weight:700">${totalML.toLocaleString('es-MX')}</td>
     <td style="text-align:center;font-weight:700;color:var(--cyan)">${totalML.toLocaleString('es-MX')} / ${totExist.toLocaleString('es-MX')}</td>
     <td></td>
   </tr>`;
@@ -2935,7 +3531,7 @@ async function publishToGitHub() {
 
 function showGHStatus(msg, color) {
   const el = document.getElementById('ghStatus');
-  const colors = { green:'rgba(27,196,125,0.12)', amber:'rgba(245,158,11,0.12)', red:'rgba(232,75,58,0.12)', text2:'var(--surface2)' };
+  const colors = { green:'rgba(113,168,80,0.12)', amber:'rgba(169,106,0,0.12)', red:'rgba(192,57,43,0.12)', text2:'var(--surface2)' };
   const textColors = { green:'var(--green)', amber:'var(--amber)', red:'var(--red)', text2:'var(--text2)' };
   el.style.display = 'block';
   el.style.background = colors[color] || colors.text2;
@@ -3117,7 +3713,7 @@ function renderPoEntregar() {
   tfoot.innerHTML='';
 
   if (!rows.length) {
-    tbody.innerHTML=`<tr><td colspan="11"><div class="empty"><div class="empty-icon">📦</div>No hay productos pendientes de entrega a GU</div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="15"><div class="empty"><div class="empty-icon">📦</div>No hay productos pendientes de entrega a GU</div></td></tr>`;
     if(scrollers.poentregar){scrollers.poentregar.destroy();delete scrollers.poentregar;}
     return;
   }
@@ -3162,13 +3758,15 @@ function renderPoEntregar() {
     const tdEx=document.createElement('td'); tdEx.className='r'; tdEx.textContent=fmtNum(parseNum(row._raw[COL.existencia])); tr.appendChild(tdEx);
     const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(parseNum(row._raw[COL.valorInv])); tr.appendChild(tdV);
     tr.appendChild(makeCommentCell(row._idx));
+    tr.appendChild(makeResponsableCell(row._idx));
+    appendExtraCells(tr, row);
     return tr;
   };
 
   if (scrollers.poentregar) scrollers.poentregar.setRows(rows);
-  else scrollers.poentregar = createVirtualScroller(document.getElementById('scrollPoEntregar'), tbody, rows, buildRow, 11);
+  else scrollers.poentregar = createVirtualScroller(document.getElementById('scrollPoEntregar'), tbody, rows, buildRow, 15);
 
-  tfoot.innerHTML=`<tr><td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td></tr>`;
+  tfoot.innerHTML=`<tr><td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
   // Show orphan products (saved state but not in current Excel)
   const poPanel = document.getElementById('tab-poentregar');
@@ -3193,7 +3791,7 @@ function renderEntregadoGU() {
   tfoot.innerHTML='';
 
   if (!pendRows.length) {
-    tbody.innerHTML=`<tr><td colspan="11"><div class="empty"><div class="empty-icon">✅</div>No hay productos pendientes de venta</div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="16"><div class="empty"><div class="empty-icon">✅</div>No hay productos pendientes de venta</div></td></tr>`;
     if(scrollers.entregado){scrollers.entregado.destroy();delete scrollers.entregado;}
   } else {
     let tEx=pendRows.reduce((s,r)=>s+parseNum(r._raw[COL.existencia]),0);
@@ -3227,7 +3825,7 @@ function renderEntregadoGU() {
       const cobE=getCobrarEntry(cod);
       if (cobE.porcobrar && !cobE.cobrado) {
         const badge=document.createElement('span');
-        badge.style.cssText='margin-left:6px;font-size:0.6rem;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(245,158,11,0.2);color:var(--amber);border:1px solid rgba(245,158,11,0.4)';
+        badge.style.cssText='margin-left:6px;font-size:0.6rem;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(169,106,0,0.2);color:var(--amber);border:1px solid rgba(169,106,0,0.4)';
         badge.textContent='💳 Por cobrar'; tdFe.appendChild(badge);
       }
       tr.appendChild(tdFe);
@@ -3239,6 +3837,7 @@ function renderEntregadoGU() {
       const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(parseNum(row._raw[COL.valorInv])); tr.appendChild(tdV);
       tr.appendChild(makeCommentCell(row._idx));
       tr.appendChild(makeResponsableCell(row._idx));
+      appendExtraCells(tr, row);
 
       // ↩ Regresar al inventario
       const tdR=document.createElement('td');
@@ -3259,15 +3858,15 @@ function renderEntregadoGU() {
     };
 
     if (scrollers.entregado) scrollers.entregado.setRows(pendRows);
-    else scrollers.entregado = createVirtualScroller(document.getElementById('scrollEntregado'), tbody, pendRows, buildPendRow, 13);
-    tfoot.innerHTML=`<tr><td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td><td></td><td></td></tr>`;
+    else scrollers.entregado = createVirtualScroller(document.getElementById('scrollEntregado'), tbody, pendRows, buildPendRow, 16);
+    tfoot.innerHTML=`<tr><td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
   }
 
   // ── VENDIDOS ──
   const tbodyV = document.getElementById('tbodyVendidos');
   tbodyV.innerHTML='';
   if (!vendRows.length) {
-    tbodyV.innerHTML=`<tr><td colspan="11"><div class="empty" style="padding:24px"><div class="empty-icon">💰</div>Aún no hay productos vendidos</div></td></tr>`;
+    tbodyV.innerHTML=`<tr><td colspan="14"><div class="empty" style="padding:24px"><div class="empty-icon">💰</div>Aún no hay productos vendidos</div></td></tr>`;
     return;
   }
   vendRows.forEach((row,i)=>{
@@ -3283,6 +3882,7 @@ function renderEntregadoGU() {
     const tdEx=document.createElement('td'); tdEx.className='r'; tdEx.textContent=fmtNum(parseNum(row._raw[COL.existencia])); tr.appendChild(tdEx);
     const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(parseNum(row._raw[COL.valorInv])); tr.appendChild(tdV);
     tr.appendChild(makeCommentCell(row._idx));
+    appendExtraCells(tr, row);
     // Undo button
     const tdU=document.createElement('td');
     const btn=document.createElement('button'); btn.className='btn btn-ghost'; btn.style.fontSize='0.65rem'; btn.textContent='↩';
@@ -3333,6 +3933,8 @@ function renderInvFisico() {
   if (search) rows=rows.filter(r=>String(r._raw[COL.codigo]||'').toLowerCase().includes(search)||String(r._raw[COL.articulo]||'').toLowerCase().includes(search));
   if (almF)  rows=rows.filter(r=>String(r._raw[COL.almacen]||'').trim()===almF);
   if (clasF) rows=rows.filter(r=>getClasif(r)===clasF);
+  const equipoF = document.getElementById('filterEquipoInvFisico').value;
+  if (equipoF) rows=rows.filter(r=>getEquipo(r)===equipoF);
   rows.sort((a,b)=>(calcMeses(b)||0)-(calcMeses(a)||0));
 
   const tbody=document.getElementById('tbodyInvFisico');
@@ -3340,7 +3942,7 @@ function renderInvFisico() {
   tfoot.innerHTML='';
 
   if (!rows.length) {
-    tbody.innerHTML=`<tr><td colspan="12"><div class="empty"><div class="empty-icon">🏭</div>No hay productos rezagados en los almacenes físicos disponibles</div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="16"><div class="empty"><div class="empty-icon">🏭</div>No hay productos rezagados en los almacenes físicos disponibles</div></td></tr>`;
     if(scrollers.invfisico){scrollers.invfisico.destroy();delete scrollers.invfisico;}
     return;
   }
@@ -3353,7 +3955,7 @@ function renderInvFisico() {
     const meses=calcMeses(row);
     const isPorCobrar=getCobrarEntry(cod).porcobrar && !getCobrarEntry(cod).cobrado;
     const tr=document.createElement('tr');
-    if (isPorCobrar) tr.style.background='rgba(245,158,11,0.06)';
+    if (isPorCobrar) tr.style.background='rgba(169,106,0,0.06)';
 
     const tdCk=document.createElement('td');
     const ck=document.createElement('input'); ck.type='checkbox'; ck.className='row-check';
@@ -3396,21 +3998,23 @@ function renderInvFisico() {
     const tdEx=document.createElement('td'); tdEx.className='r'; tdEx.textContent=fmtNum(parseNum(row._raw[COL.existencia])); tr.appendChild(tdEx);
     const tdV=document.createElement('td'); tdV.className='r'; tdV.textContent=fmtMoney(parseNum(row._raw[COL.valorInv])); tr.appendChild(tdV);
     tr.appendChild(makeCommentCell(row._idx));
+    tr.appendChild(makeResponsableCell(row._idx));
+    appendExtraCells(tr, row);
     return tr;
   };
 
   if(scrollers.invfisico) scrollers.invfisico.setRows(rows);
-  else scrollers.invfisico=createVirtualScroller(document.getElementById('scrollInvFisico'),tbody,rows,buildRow,12);
-  tfoot.innerHTML=`<tr><td colspan="9" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td></tr>`;
+  else scrollers.invfisico=createVirtualScroller(document.getElementById('scrollInvFisico'),tbody,rows,buildRow,16);
+  tfoot.innerHTML=`<tr><td colspan="9" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td><td class="r">${fmtNum(tEx)}</td><td class="r">${fmtMoney(tVal)}</td><td></td><td></td><td></td><td></td><td></td></tr>`;
 }
 
 function exportInvFisico() {
   const rows=getInvFisicoRows(); if(!rows.length){alert('Sin datos.');return;}
   const wb=XLSX.utils.book_new();
-  const sheet=[['Código','Vendedor','Artículo','Almacén','Clasificación','Última Compra','Meses Rezago','Existencia','Valor Inventario','Por Cobrar','Comentario']];
-  rows.forEach(r=>{const ce=getCobrarEntry(String(r._raw[COL.codigo]||'').trim()); sheet.push([r._raw[COL.codigo],getVendedor(r),r._raw[COL.articulo],r._raw[COL.almacen],getClasif(r),r._raw[COL.ultCompra],calcMeses(r),parseNum(r._raw[COL.existencia]),parseNum(r._raw[COL.valorInv]),ce.porcobrar&&!ce.cobrado?'SÍ':'NO',comments[r._idx]||'']);});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sheet),'Inventario Físico');
-  XLSX.writeFile(wb,`inventario_fisico_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const cols=colsProducto([{ label:'Por Cobrar', w:12, fn:r=>{const ce=getCobrarEntry(String(r._raw[COL.codigo]||'').trim()); return ce.porcobrar&&!ce.cobrado?'SÍ':'NO';} }]);
+  XLSX.utils.book_append_sheet(wb,hojaProductos(rows,cols),'Inventario Físico');
+  hojaLeyenda(wb,'Inventario físico en almacenes MC');
+  XLSX.writeFile(wb,nombreArchivo('inventario_fisico'));
 }
 
 function updateInvFisicoBadge() {
@@ -3447,7 +4051,7 @@ function renderPorCobrar() {
 
   // ── PENDIENTES ──
   if(!pendRows.length){
-    tbody.innerHTML=`<tr><td colspan="13"><div class="empty"><div class="empty-icon">💳</div>No hay productos pendientes de cobro</div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="18"><div class="empty"><div class="empty-icon">💳</div>No hay productos pendientes de cobro</div></td></tr>`;
     if(scrollers.porcobrar){scrollers.porcobrar.destroy();delete scrollers.porcobrar;}
   } else {
     const tEx=pendRows.reduce((s,r)=>s+parseNum(r._raw[COL.existencia]),0);
@@ -3459,7 +4063,7 @@ function renderPorCobrar() {
       const cobradas=piezasCobradas(cod);
       const pendiente=Math.max(0, exist - cobradas);
       const tr=document.createElement('tr');
-      if (cobradas > 0) tr.style.background='rgba(27,196,125,0.04)';
+      if (cobradas > 0) tr.style.background='rgba(113,168,80,0.04)';
 
       const tdN=document.createElement('td'); tdN.textContent=i+1; tdN.style.color='var(--text3)'; tr.appendChild(tdN);
       const tdC=document.createElement('td'); tdC.textContent=cod; tdC.style.fontWeight='600'; tr.appendChild(tdC);
@@ -3489,7 +4093,7 @@ function renderPorCobrar() {
       const inp=document.createElement('input');
       inp.type='number'; inp.min='1'; inp.step='1'; inp.value=pendiente>0?pendiente:0;
       inp.style.cssText=`width:64px;background:var(--surface2);border:1px solid var(--border2);color:var(--green);
-        font-family:'Inter',sans-serif;font-size:0.76rem;font-weight:600;padding:4px 6px;
+        font-family:'Maven Pro','Myriad Pro',sans-serif;font-size:0.76rem;font-weight:600;padding:4px 6px;
         border-radius:4px 0 0 4px;text-align:center;outline:none;`;
       inp.addEventListener('focus',()=>inp.style.borderColor='var(--green)');
       inp.addEventListener('blur',()=>inp.style.borderColor='var(--border2)');
@@ -3516,6 +4120,7 @@ function renderPorCobrar() {
 
       tr.appendChild(makeCommentCell(row._idx));
       tr.appendChild(makeResponsableCell(row._idx));
+      appendExtraCells(tr, row);
 
       // ↩ Regresar a Rezagados
       const tdR=document.createElement('td');
@@ -3536,13 +4141,13 @@ function renderPorCobrar() {
       return tr;
     };
     if(scrollers.porcobrar) scrollers.porcobrar.setRows(pendRows);
-    else scrollers.porcobrar=createVirtualScroller(document.getElementById('scrollPorCobrar'),tbody,pendRows,buildCobrarRow,15);
+    else scrollers.porcobrar=createVirtualScroller(document.getElementById('scrollPorCobrar'),tbody,pendRows,buildCobrarRow,18);
     tfoot.innerHTML=`<tr>
       <td colspan="8" style="text-align:right;color:var(--text3);font-size:0.65rem">TOTALES</td>
       <td class="r">${fmtNum(pendRows.reduce((s,r)=>s+parseNum(r._raw[COL.existencia]),0))}</td>
       <td class="r" style="color:var(--green)">${fmtNum(pendRows.reduce((s,r)=>s+piezasCobradas(String(r._raw[COL.codigo]||'').trim()),0))}</td>
       <td class="r" style="color:var(--amber)">${fmtNum(pendRows.reduce((s,r)=>{const ex=parseNum(r._raw[COL.existencia]);return s+Math.max(0,ex-piezasCobradas(String(r._raw[COL.codigo]||'').trim()));},0))}</td>
-      <td></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
     </tr>`;
   }
 
@@ -3582,7 +4187,7 @@ function renderPorCobrar() {
 
     const header=document.createElement('div');
     header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px 6px 0 0;margin-top:14px;';
-    header.innerHTML=`<span style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.82rem;color:var(--green)">✅ ${fecha}</span>
+    header.innerHTML=`<span style="font-family:'Maven Pro','Myriad Pro',sans-serif;font-weight:700;font-size:0.82rem;color:var(--green)">✅ ${fecha}</span>
       <span style="font-size:0.72rem;color:var(--text2)">${cobros.length} movimiento${cobros.length!==1?'s':''} · <strong style="color:var(--green)">${totPiezas.toLocaleString('es-MX')} piezas</strong> · ${fmtMoney(totValor)}</span>`;
     container.appendChild(header);
 
@@ -3603,7 +4208,7 @@ function renderPorCobrar() {
     cobros.forEach((c,i)=>{
       const exist=parseNum(c.row._raw[COL.existencia]); const val=parseNum(c.row._raw[COL.valorInv]);
       const valorPieza=exist>0?val/exist:0;
-      const tr=document.createElement('tr'); tr.style.cssText='border-top:1px solid rgba(42,44,63,0.5);opacity:0.88;';
+      const tr=document.createElement('tr'); tr.style.cssText='border-top:1px solid rgba(195,208,216,0.9);opacity:0.88;';
       [
         {v:i+1,s:'color:var(--text3);padding:7px 11px'},
         {v:c.cod,s:'font-weight:600;padding:7px 11px'},
@@ -3638,13 +4243,13 @@ function renderPorCobrar() {
 function exportPorCobrar() {
   const wb=XLSX.utils.book_new();
   // Sheet 1: Pending
-  const pend=[['Código','Vendedor','Artículo','Almacén','Clasificación','Fecha Registro','Meses Rezago','Existencia','Piezas Cobradas','Piezas Pendientes','Comentario']];
-  rawData.filter(r=>getCobrarEntry(String(r._raw[COL.codigo]||'').trim()).porcobrar).forEach(r=>{
-    const cod=String(r._raw[COL.codigo]||'').trim(); const exist=parseNum(r._raw[COL.existencia]);
-    const cobradas=piezasCobradas(cod);
-    pend.push([cod,getVendedor(r),r._raw[COL.articulo],r._raw[COL.almacen],getClasif(r),getCobrarEntry(cod).fechaRegistro||'',calcMeses(r),exist,cobradas,Math.max(0,exist-cobradas),comments[r._idx]||'']);
-  });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pend),'Por Cobrar');
+  const pendRows=rawData.filter(r=>getCobrarEntry(String(r._raw[COL.codigo]||'').trim()).porcobrar);
+  const pendCols=colsProducto([
+    { label:'Fecha Registro',   w:15, fn:r=>getCobrarEntry(String(r._raw[COL.codigo]||'').trim()).fechaRegistro||'' },
+    { label:'Piezas Cobradas',  w:15, fn:r=>piezasCobradas(String(r._raw[COL.codigo]||'').trim()) },
+    { label:'Piezas Pendientes',w:16, fn:r=>Math.max(0,parseNum(r._raw[COL.existencia])-piezasCobradas(String(r._raw[COL.codigo]||'').trim())) },
+  ]);
+  XLSX.utils.book_append_sheet(wb,hojaProductos(pendRows,pendCols),'Por Cobrar');
   // Sheet 2: Cobros detalle
   const det=[['Código','Vendedor','Artículo','Almacén','Fecha Cobro','Piezas','Valor Aprox.']];
   rawData.forEach(r=>{
@@ -3653,6 +4258,7 @@ function exportPorCobrar() {
     (ce.cobros||[]).forEach(c=>{ if((c.piezas||0)>0) det.push([cod,getVendedor(r),r._raw[COL.articulo],r._raw[COL.almacen],c.fecha||'',c.piezas,exist>0?Math.round(val/exist*c.piezas):0]); });
   });
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(det),'Cobros Detalle');
+  hojaLeyenda(wb,'Productos por cobrar');
   XLSX.writeFile(wb,`por_cobrar_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
@@ -3671,26 +4277,25 @@ function updateGUBadges() {
 }
 
 function exportPoEntregar() {
-  const rows = getPoEntregarRows();
-  if (!rows.length){alert('No hay productos por entregar.');return;}
+  const rows=getPoEntregarRows(); if(!rows.length){alert('Sin datos.');return;}
   const wb=XLSX.utils.book_new();
-  const sheet=[['Código','Vendedor','Artículo','Clasificación','Última Compra','Meses Rezago','Existencia','Valor Inventario','Comentario']];
-  rows.forEach(r=>sheet.push([r._raw[COL.codigo],getVendedor(r),r._raw[COL.articulo],getClasif(r),r._raw[COL.ultCompra],calcMeses(r),parseNum(r._raw[COL.existencia]),parseNum(r._raw[COL.valorInv]),comments[r._idx]||'']));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sheet),'Por Entregar a GU');
-  XLSX.writeFile(wb,`por_entregar_GU_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const cols=colsProducto([{ label:'Fecha Registro', w:15, fn:r=>getCobrarEntry(String(r._raw[COL.codigo]||'').trim()).fechaRegistro||'' }]);
+  XLSX.utils.book_append_sheet(wb,hojaProductos(rows,cols),'Por Entregar a GU');
+  hojaLeyenda(wb,'Productos por entregar a GU');
+  XLSX.writeFile(wb,nombreArchivo('por_entregar_gu'));
 }
 
 function exportEntregadoGU() {
+  const rows=[...getEntregadoRows(),...getVendidoRows()]; if(!rows.length){alert('Sin datos.');return;}
   const wb=XLSX.utils.book_new();
-  const pend=getEntregadoRows(); const vend=getVendidoRows();
-  const headers=['Código','Vendedor','Artículo','Clasificación','Fecha Entrega','Meses Rezago','Existencia','Valor Inventario','Estado','Fecha Venta','Comentario'];
-  const sheet=[headers];
-  [...pend,...vend].forEach(r=>{
-    const cod=String(r._raw[COL.codigo]||'').trim(); const e=getGUEntry(cod);
-    sheet.push([cod,getVendedor(r),r._raw[COL.articulo],getClasif(r),e.fechaEntrega||'',calcMeses(r),parseNum(r._raw[COL.existencia]),parseNum(r._raw[COL.valorInv]),e.vendido?'VENDIDO':'PENDIENTE',e.fechaVenta||'',comments[r._idx]||'']);
-  });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sheet),'Entregado a GU');
-  XLSX.writeFile(wb,`entregado_GU_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const cols=colsProducto([
+    { label:'Fecha Entrega', w:15, fn:r=>getGUEntry(String(r._raw[COL.codigo]||'').trim()).fechaEntrega||'' },
+    { label:'Vendido',       w:11, fn:r=>getGUEntry(String(r._raw[COL.codigo]||'').trim()).vendido?'SÍ':'NO' },
+    { label:'Fecha Venta',   w:15, fn:r=>getGUEntry(String(r._raw[COL.codigo]||'').trim()).fechaVenta||'' },
+  ]);
+  XLSX.utils.book_append_sheet(wb,hojaProductos(rows,cols),'Entregado a GU');
+  hojaLeyenda(wb,'Productos entregados a GU');
+  XLSX.writeFile(wb,nombreArchivo('entregado_gu'));
 }
 
 function toggleTabDropdown(e) {
@@ -3743,7 +4348,7 @@ function renderHuerfanos(containerEl, huerfanos, context) {
 
   const section = document.createElement('div');
   section.className = 'huerfanos-section';
-  section.style.cssText = 'margin-top:24px;border-top:2px dashed rgba(245,158,11,0.4);padding-top:20px;';
+  section.style.cssText = 'margin-top:24px;border-top:2px dashed rgba(169,106,0,0.4);padding-top:20px;';
 
   const header = document.createElement('div');
   header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;';
@@ -3751,7 +4356,7 @@ function renderHuerfanos(containerEl, huerfanos, context) {
     <div style="display:flex;align-items:center;gap:10px;">
       <span style="font-size:1.1rem;">⚠️</span>
       <div>
-        <div style="font-family:'Barlow',sans-serif;font-weight:700;font-size:0.82rem;color:var(--amber)">
+        <div style="font-family:'Maven Pro','Myriad Pro',sans-serif;font-weight:700;font-size:0.82rem;color:var(--amber)">
           ${huerfanos.length} producto${huerfanos.length!==1?'s':''} no encontrado${huerfanos.length!==1?'s':''} en el Excel actual
         </div>
         <div style="font-size:0.68rem;color:var(--text3);margin-top:2px;">
@@ -3759,12 +4364,12 @@ function renderHuerfanos(containerEl, huerfanos, context) {
         </div>
       </div>
     </div>
-    <span style="font-size:0.62rem;padding:3px 9px;border-radius:4px;background:rgba(245,158,11,0.12);color:var(--amber);border:1px solid rgba(245,158,11,0.3);">DATOS DEL ÚLTIMO GUARDADO</span>`;
+    <span style="font-size:0.62rem;padding:3px 9px;border-radius:4px;background:rgba(169,106,0,0.12);color:var(--amber);border:1px solid rgba(169,106,0,0.3);">DATOS DEL ÚLTIMO GUARDADO</span>`;
   section.appendChild(header);
 
   const tbl = document.createElement('table');
-  tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.73rem;border:1px solid rgba(245,158,11,0.25);border-radius:6px;overflow:hidden;';
-  tbl.innerHTML = `<thead><tr style="background:rgba(245,158,11,0.08);">
+  tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.73rem;border:1px solid rgba(169,106,0,0.25);border-radius:6px;overflow:hidden;';
+  tbl.innerHTML = `<thead><tr style="background:rgba(169,106,0,0.08);">
     <th style="padding:8px 11px;text-align:left;font-size:0.6rem;color:var(--amber);text-transform:uppercase;letter-spacing:1px;">#</th>
     <th style="padding:8px 11px;text-align:left;">Código</th>
     <th style="padding:8px 11px;text-align:left;color:var(--cyan);">Vendedor</th>
@@ -3781,7 +4386,7 @@ function renderHuerfanos(containerEl, huerfanos, context) {
   const tbody = document.createElement('tbody');
   huerfanos.forEach((h, i) => {
     const tr = document.createElement('tr');
-    tr.style.cssText = 'border-top:1px solid rgba(245,158,11,0.15);opacity:0.85;';
+    tr.style.cssText = 'border-top:1px solid rgba(169,106,0,0.15);opacity:0.85;';
 
     const cells = [
       { v: i+1,        s: 'color:var(--text3)' },
