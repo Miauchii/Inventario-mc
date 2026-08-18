@@ -214,9 +214,11 @@ main { max-width: 1680px; margin: 0 auto; padding: 28px 32px 64px; }
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-md) var(--r-md) 0 0; border-bottom: none;
   display: flex; padding: 0 8px; gap: 2px;
-  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  /* Sin overflow: recortaría el menú desplegable de Análisis, que se dibuja
+     por debajo de esta barra. En pantallas angostas las pestañas bajan de
+     renglón en vez de desplazarse. */
+  flex-wrap: wrap;
 }
-.tabs-wrap::-webkit-scrollbar { display: none; }
 .tab-btn {
   padding: 15px 18px; background: none; border: none;
   color: var(--text2); font-family: var(--font);
@@ -495,6 +497,9 @@ tr.tachado td:first-child { text-decoration: none; }
 
 /* ─── COLUMNAS DERIVADAS ─────────────────────────────── */
 .col-purple { background: rgba(0,86,112,0.035); }
+/* En el encabezado el fondo debe ser OPACO: es sticky y las filas pasan por debajo */
+thead th.col-purple { background-color: #edf2f5; }
+thead th.col-compra { background-color: #e8f1f5; }
 .col-purple-text { color: var(--purple); }
 
 /* ─── MODALES ────────────────────────────────────────── */
@@ -772,7 +777,7 @@ tr.tachado td:first-child { text-decoration: none; }
           <thead><tr>
             <th>Empresa</th><th>Almacén</th><th>Código</th><th style="color:var(--cyan)">Vendedor</th><th>Artículo</th>
             <th>N° Parte</th><th>UM</th><th>Clasificación</th><th>Últ. Movimiento</th>
-            <th style="background:rgba(0,132,174,0.06)">Última Compra</th>
+            <th class="col-compra">Última Compra</th>
             <th class="r">Costo Unitario</th><th class="r">Existencia</th><th class="r">Valor Inventario</th>
             <th class="col-purple">Fecha Efectiva</th><th class="col-purple" style="font-size:0.52rem">Origen</th>
             <th class="r">Meses Rezago</th><th>Estado</th><th>Comentario</th>
@@ -1187,7 +1192,89 @@ tr.tachado td:first-child { text-decoration: none; }
 
 <script>
 // ── COLUMN MAP ────────────────────────────────────────────────────────────
+// Orden canónico interno. Las filas se normalizan a este orden al cargar el
+// archivo, así el resto del código no depende del layout del Excel de origen.
 const COL = { empresa:0, almacen:1, codigo:2, articulo:3, nparte:4, um:5, clasificacion:6, ultMov:7, ultCompra:8, costoUnit:9, existencia:10, valorInv:11 };
+
+// Sinónimos aceptados para cada columna (sin acentos y en minúsculas)
+const ALIAS_COL = {
+  empresa:       ['empresa','emp'],
+  almacen:       ['almacen','bodega'],
+  codigo:        ['codigo','clave','sku'],
+  articulo:      ['articulo','descripcion','producto'],
+  nparte:        ['numero de parte','no de parte','n de parte','num parte','nparte','parte','no parte'],
+  um:            ['unidad de medida','um','unidad'],
+  clasificacion: ['clasificacion','clasif'],
+  ultMov:        ['ultimo movimiento','ult movimiento','ultimo mov'],
+  ultCompra:     ['ultima compra','ult compra'],
+  costoUnit:     ['costo unitario','costo unit','costo'],
+  existencia:    ['existencia','existencias','cantidad'],
+  valorInv:      ['valor del inventario','valor inventario','valor inv','valor'],
+};
+
+function normalizarTexto(t) {
+  return String(t == null ? '' : t)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim().toLowerCase();
+}
+
+// Devuelve { clave: índice } según los encabezados reales del archivo.
+// Si el archivo no trae Empresa, esa clave queda en -1.
+function mapearColumnas(encabezados) {
+  const norm = (encabezados || []).map(normalizarTexto);
+  const mapa = {};
+  Object.keys(ALIAS_COL).forEach(clave => {
+    let idx = norm.findIndex(h => ALIAS_COL[clave].includes(h));
+    if (idx < 0) idx = norm.findIndex(h => h && ALIAS_COL[clave].some(a => h.startsWith(a)));
+    mapa[clave] = idx;
+  });
+  return mapa;
+}
+
+// Reordena una fila del Excel al orden canónico de COL
+function normalizarFila(fila, mapa) {
+  const out = new Array(12).fill('');
+  Object.keys(COL).forEach(clave => {
+    const i = mapa[clave];
+    out[COL[clave]] = (i >= 0 && fila[i] !== undefined) ? fila[i] : '';
+  });
+  return out;
+}
+
+// Se guarda para avisar en pantalla si faltan columnas
+let colsFaltantes = [];
+let filasIgnoradas = 0;   // filas sin código (totales al pie del reporte)
+
+const NOMBRE_COL = { empresa:'Empresa', almacen:'Almacén', codigo:'Código', articulo:'Artículo',
+  nparte:'N° de parte', um:'Unidad de medida', clasificacion:'Clasificación', ultMov:'Último movimiento',
+  ultCompra:'Última compra', costoUnit:'Costo unitario', existencia:'Existencia', valorInv:'Valor del inventario' };
+
+function avisoColumnas() {
+  const partes = [];
+  if (filasIgnoradas) partes.push(`${filasIgnoradas} fila${filasIgnoradas>1?'s':''} de totales ignorada${filasIgnoradas>1?'s':''}`);
+  if (colsFaltantes.length) partes.push(`⚠ sin columna ${colsFaltantes.map(c => NOMBRE_COL[c] || c).join(', ')}`);
+  return partes.length ? ' · ' + partes.join(' · ') : '';
+}
+
+function prepararFilas(json) {
+  const mapa = mapearColumnas(json[0] || []);
+  colsFaltantes = Object.keys(ALIAS_COL).filter(k => mapa[k] < 0);
+  const filas = [];
+  let ignoradas = 0;
+  for (let i = 1; i < json.length; i++) {
+    const fila = json[i];
+    if (!fila || fila.every(c => c === '' || c === null || c === undefined)) continue;
+    const norm = normalizarFila(fila, mapa);
+    // Los reportes traen una fila de TOTALES al final, sin código pero con
+    // cifras. Si se cuenta como producto, duplica piezas y valor.
+    if (!String(norm[COL.codigo] || '').trim()) { ignoradas++; continue; }
+    filas.push({ _idx: filas.length, _raw: norm });
+  }
+  filasIgnoradas = ignoradas;
+  return filas;
+}
 const MESES_UMBRAL = 3;
 const BAR_COLORS = ['#005670','#0084ae','#71a850','#246681','#00acd2','#78aa65','#878787','#4f8a33','#a67c00'];
 
@@ -1292,9 +1379,10 @@ function createVirtualScroller(scrollEl, tbodyEl, allRows, rowBuilder, colCount)
     // real de fila y repinta si la estimación estaba equivocada.
     if (!ajustado) {
       const fijadas = fijarColumnas();
-      const cambio  = medirAlturaFila();
       if (fijadas) ajustado = true;   // si la tabla aún no es visible, se reintenta
-      if (cambio || fijadas) { render(); return; }
+      // Solo vale la pena repintar si la altura de fila real cambió: aplicar el
+      // colgroup por sí solo ya reacomoda las filas que están en pantalla.
+      if (medirAlturaFila()) { render(); return; }
     }
   }
 
@@ -1352,7 +1440,9 @@ function getVendedor(row) {
   const emp = String(row._raw[COL.empresa] || '').trim().toUpperCase();
   const cod = String(row._raw[COL.codigo] || '').trim().toUpperCase();
   const prefix = cod.match(/^([A-Z]+)/)?.[1] || cod.substring(0, 3);
-  return VENDEDOR_MAP[`${emp}|${prefix}`] || '';
+  if (emp) return VENDEDOR_MAP[`${emp}|${prefix}`] || '';
+  // Archivos sin columna Empresa: se busca en MC y luego en CC
+  return VENDEDOR_MAP[`MC|${prefix}`] || VENDEDOR_MAP[`CC|${prefix}`] || '';
 }
 
 // ── PLATAFORMAS — constants and state defined early so loadPersisted() can use them ──
@@ -1574,11 +1664,7 @@ function processFile(file) {
       headers = json[0] ? json[0].map(h => String(h)) : [];
       rawData = []; discarded = new Set(); comments = {}; responsables = {}; selectedYear = null; selectedEmp = null; selectedAlm = null;
       Object.keys(scrollers).forEach(k => { if(scrollers[k]) { scrollers[k].destroy(); delete scrollers[k]; } });
-      for (let i = 1; i < json.length; i++) {
-        const row = json[i];
-        if (row.every(c => c === '' || c === null || c === undefined)) continue;
-        rawData.push({ _idx: i - 1, _raw: row });
-      }
+      rawData = prepararFilas(json);
       // Restore persisted data
       loadPersisted();
       restoreCommentsByCode();
@@ -1589,7 +1675,7 @@ function processFile(file) {
       saveExcelToStorage(arrayBuf, file.name);
 
       showLoading(false);
-      setStatus(`✓ ${file.name} — ${rawData.length} productos cargados`);
+      setStatus(`✓ ${file.name} — ${rawData.length} productos cargados${avisoColumnas()}`);
       showApp(file.name);
       populateFilters(); updateStats();
       Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
@@ -1765,17 +1851,13 @@ function loadSavedExcel() {
     rawData = []; discarded = new Set(); comments = {}; responsables = {};
     selectedYear = null; selectedEmp = null; selectedAlm = null;
     Object.keys(scrollers).forEach(k => { if(scrollers[k]) { scrollers[k].destroy(); delete scrollers[k]; } });
-    for (let i = 1; i < json.length; i++) {
-      const row = json[i];
-      if (row.every(c => c === '' || c === null || c === undefined)) continue;
-      rawData.push({ _idx: i - 1, _raw: row });
-    }
+    rawData = prepararFilas(json);
     loadPersisted();
     restoreCommentsByCode();
     restoreDiscardedByCode();
 
     showLoading(false);
-    setStatus(`✓ ${name} — ${rawData.length} productos (cargado automáticamente)`);
+    setStatus(`✓ ${name} — ${rawData.length} productos (cargado automáticamente)${avisoColumnas()}`);
     showApp(name);
     populateFilters(); updateStats();
     Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
@@ -1815,12 +1897,15 @@ function codeYear(codigo) {
   return m ? parseInt('20'+m[1]) : null;
 }
 function effectiveDate(row) {
+  // Se cachea en la fila: el cálculo es idéntico mientras no se recargue el
+  // archivo, y las filas se reconstruyen en cada carga.
+  if (row._ef !== undefined) return row._ef;
   const emp = String(row._raw[COL.empresa]||'').trim().toUpperCase();
   const compra = parseDate(row._raw[COL.ultCompra]);
   const mov    = parseDate(row._raw[COL.ultMov]);
   const cy_    = compra ? compra.getFullYear() : null;
   let base = compra;
-  if (['MC','CC','GU'].includes(emp)) {
+  if (['MC','CC','GU',''].includes(emp)) {
     base = (cy_===2017) ? (mov||compra) : compra;
     const cy = codeYear(row._raw[COL.codigo]);
     const byr = base ? base.getFullYear() : null;
@@ -1828,19 +1913,23 @@ function effectiveDate(row) {
   } else if (emp === 'ADV') {
     base = (cy_===2023) ? (mov||compra) : compra;
   }
-  return base || null;
+  row._ef = base || null;
+  return row._ef;
 }
 function calcMeses(row) {
-  const d = effectiveDate(row); if (!d) return null;
+  if (row._meses !== undefined) return row._meses;
+  const d = effectiveDate(row);
+  if (!d) { row._meses = null; return null; }
   const h = new Date();
-  return (h.getFullYear()-d.getFullYear())*12 + (h.getMonth()-d.getMonth());
+  row._meses = (h.getFullYear()-d.getFullYear())*12 + (h.getMonth()-d.getMonth());
+  return row._meses;
 }
 function getYear(row) { const d = effectiveDate(row); return d ? d.getFullYear() : null; }
 function dateOriginLabel(row) {
   const emp = String(row._raw[COL.empresa]||'').trim().toUpperCase();
   const compra = parseDate(row._raw[COL.ultCompra]);
   const cy_ = compra ? compra.getFullYear() : null;
-  if (['MC','CC','GU'].includes(emp)) {
+  if (['MC','CC','GU',''].includes(emp)) {
     if (cy_===2017) return '↩ Últ.Mov';
     const cy = codeYear(row._raw[COL.codigo]);
     const ed = effectiveDate(row);
@@ -3554,11 +3643,7 @@ async function fetchExcelFromGitHub() {
     rawData = []; discarded = new Set(); comments = {}; responsables = {};
     selectedYear = null; selectedEmp = null; selectedAlm = null;
     Object.keys(scrollers).forEach(k => { if(scrollers[k]) { scrollers[k].destroy(); delete scrollers[k]; } });
-    for (let i = 1; i < json.length; i++) {
-      const row = json[i];
-      if (row.every(c => c === '' || c === null || c === undefined)) continue;
-      rawData.push({ _idx: i - 1, _raw: row });
-    }
+    rawData = prepararFilas(json);
     loadPersisted();
     restoreCommentsByCode();
     restoreDiscardedByCode();
@@ -3567,7 +3652,7 @@ async function fetchExcelFromGitHub() {
     saveExcelToStorage(arrayBuf, 'inventario.xlsx');
 
     showLoading(false);
-    setStatus(`✓ inventario.xlsx (${sizeMB}MB) — ${rawData.length} productos · desde GitHub`);
+    setStatus(`✓ inventario.xlsx (${sizeMB}MB) — ${rawData.length} productos · desde GitHub${avisoColumnas()}`);
     showApp('inventario.xlsx');
     populateFilters(); updateStats();
     Object.keys(tabDirty).forEach(k => tabDirty[k] = true);
@@ -3886,9 +3971,6 @@ function getInvFisicoRows() {
     const cod = String(r._raw[COL.codigo]||'').trim();
     const gu = getGUEntry(cod);
     if (gu.entregado) return false;                     // ya en entregado a GU
-    const poe = getPoEntregarRows().some(x => String(x._raw[COL.codigo]||'').trim()===cod);
-    // exclude if already marked porcobrar (already in the funnel via invfisico check)
-    const alm = String(r._raw[COL.almacen]||'').trim().toUpperCase();
     return INVFISICO_ALMACENES.has(String(r._raw[COL.almacen]||'').trim());
   });
 }
